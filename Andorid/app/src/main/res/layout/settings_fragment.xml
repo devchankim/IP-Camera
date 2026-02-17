@@ -2,36 +2,74 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@android:color/white"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <TextView
         android:id="@+id/tv_settings"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        style="@style/MaterialAlertDialog.Material3.Title.Text"
         android:text="Settings"
+        android:textSize="28sp"
+        android:textColor="#1D1D1F"
+        android:fontFamily="sans-serif-medium"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="60dp"
         />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/text_input_ip"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:helperText="Format: 192.168.101:4321"
-        android:layout_marginHorizontal="@dimen/horizontal_margin"
+        app:layout_constraintTop_toBottomOf="@id/tv_settings"
+        app:helperText="Format: 192.168.0.101:8081"
+        app:helperTextTextColor="#86868B"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginTop="40dp"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        app:boxCornerRadiusTopStart="8dp"
+        app:boxCornerRadiusTopEnd="8dp"
+        app:boxCornerRadiusBottomStart="8dp"
+        app:boxCornerRadiusBottomEnd="8dp"
         >
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/edit_text_ip"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Server IP Address"
+            android:hint="Signaling Server IP:Port"
             android:inputType="textNoSuggestions"
+            android:textSize="16sp"
+            />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/text_input_token"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/text_input_ip"
+        app:helperText="Shared secret (set SIGNALING_TOKEN on server)"
+        app:helperTextTextColor="#86868B"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginTop="20dp"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        app:boxCornerRadiusTopStart="8dp"
+        app:boxCornerRadiusTopEnd="8dp"
+        app:boxCornerRadiusBottomStart="8dp"
+        app:boxCornerRadiusBottomEnd="8dp"
+        app:endIconMode="password_toggle"
+        >
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/edit_text_token"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Signaling Token"
+            android:inputType="textPassword"
+            android:textSize="16sp"
             />
 
     </com.google.android.material.textfield.TextInputLayout>
@@ -39,11 +77,13 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_save"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="@dimen/horizontal_margin"
-        android:layout_marginBottom="@dimen/horizontal_margin"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_height="56dp"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginBottom="40dp"
         android:text="Save"
+        android:textSize="16sp"
+        app:cornerRadius="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

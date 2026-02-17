@@ -1,5 +1,6 @@
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+    id 'org.jetbrains.kotlin.jvm' version '2.1.10'
+    id 'application'
 }
 
 group = 'org.example'
@@ -9,8 +10,14 @@ repositories {
     mavenCentral()
 }
 
+application {
+    // Kotlin top-level main() in src/main/kotlin/Main.kt (default package)
+    mainClass = 'MainKt'
+}
+
 dependencies {
-    implementation 'org.java-websocket:Java-WebSocket:1.5.3'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.6'
+    implementation 'com.fasterxml.jackson.module:jackson-module-kotlin:2.20.1'
     testImplementation 'org.jetbrains.kotlin:kotlin-test'
 }
 
@@ -19,9 +26,9 @@ test {
 }
 
 compileKotlin {
-    kotlinOptions.jvmTarget = '1.8'
+    kotlinOptions.jvmTarget = '17'
 }
 
 compileTestKotlin {
-    kotlinOptions.jvmTarget = '1.8'
+    kotlinOptions.jvmTarget = '17'
 }

@@ -1,7 +1,6 @@
-@import url('http://fonts.googleapis.com/css?family=Roboto:300,400,500,700');
-
 * {
-    font-family: 'Roboto';
+    /* No external font fetches (offline/private). */
+    font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
 }
 
 body {

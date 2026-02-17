@@ -52,7 +52,8 @@ class MainFragment : Fragment() {
                         Toast.LENGTH_LONG
                     ).show()
                 } else {
-                    startActivity(Intent(requireContext(), StreamActivity::class.java))
+                    // Use WebRTC stream
+                    startActivity(Intent(requireContext(), WebRTCStreamActivity::class.java))
                 }
 
             } else {
@@ -79,7 +80,7 @@ class MainFragment : Fragment() {
 
         if (requestCode == PERMISSION_REQ_CODE) {
             if (CameraPermissionActivity.hasPermission(requireContext())) {
-                startActivity(Intent(requireContext(), StreamActivity::class.java))
+                startActivity(Intent(requireContext(), WebRTCStreamActivity::class.java))
             }
         }
     }

@@ -1,12 +1,32 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.IpCamera" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.IpCamera" parent="Theme.Material3.Light.NoActionBar">
 
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/white</item>
+        <item name="android:statusBarColor">@android:color/white</item>
 
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
 
+        <!-- Primary color (Apple blue) -->
+        <item name="colorPrimary">#007AFF</item>
+        <item name="colorPrimaryVariant">#0051D5</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+
+        <!-- Surface colors -->
+        <item name="colorSurface">@android:color/white</item>
+        <item name="colorOnSurface">#1D1D1F</item>
+
+        <!-- Background -->
+        <item name="android:colorBackground">@android:color/white</item>
+
+        <!-- Button style -->
+        <item name="materialButtonStyle">@style/Widget.BabyCam.Button</item>
+    </style>
+
+    <style name="Widget.BabyCam.Button" parent="Widget.Material3.Button">
+        <item name="cornerRadius">12dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
     </style>
 
 </resources>

@@ -6,6 +6,7 @@ class SettingsPreferences(context: Context) {
 
     companion object {
         private const val IP_KEY = "ip"
+        private const val TOKEN_KEY = "signaling_token"
     }
 
     private val sharedPreferences =
@@ -19,6 +20,16 @@ class SettingsPreferences(context: Context) {
     }
 
     fun getIpAddress() : String? {
-        return sharedPreferences.getString(IP_KEY, "192.168.0.101:4321")
+        return sharedPreferences.getString(IP_KEY, "192.168.0.101:8081")
+    }
+
+    fun saveSignalingToken(token: String) {
+        sharedPreferences.edit()
+            .putString(TOKEN_KEY, token)
+            .apply()
+    }
+
+    fun getSignalingToken(): String? {
+        return sharedPreferences.getString(TOKEN_KEY, "")
     }
 }

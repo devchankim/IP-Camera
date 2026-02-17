@@ -36,6 +36,10 @@ class SettingsFragment : Fragment() {
             binding.editTextIp.setText(ipAddress)
         }
 
+        prefs.getSignalingToken()?.let { token ->
+            binding.editTextToken.setText(token)
+        }
+
         binding.editTextIp.addTextChangedListener {
             if (binding.textInputIp.error != null) {
                 binding.textInputIp.error = null
@@ -52,7 +56,10 @@ class SettingsFragment : Fragment() {
                 return@setOnClickListener
             }
 
+            val token = binding.editTextToken.text?.toString() ?: ""
+
             prefs.saveIpAddress(input)
+            prefs.saveSignalingToken(token)
 
             activity?.onBackPressed()
         }
