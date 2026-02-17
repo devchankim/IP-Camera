@@ -110,7 +110,12 @@ class SignalingWebSocketServer(
         }
     }
 
-    fun start() = server.start()
+    fun start() {
+        // Allow quick restarts even if previous TCP connections are in TIME_WAIT.
+        // Must be set before start().
+        server.setReuseAddr(true)
+        server.start()
+    }
 
     private fun handleJoin(conn: WebSocket, root: JsonNode) {
         if (requiredToken.isEmpty()) {

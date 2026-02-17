@@ -40,6 +40,20 @@ class SettingsFragment : Fragment() {
             binding.editTextToken.setText(token)
         }
 
+        // Defaults: rear camera + standard quality + STUN off
+        when (prefs.getCameraFacing()) {
+            "front" -> binding.toggleCameraFacing.check(R.id.btn_camera_front)
+            else -> binding.toggleCameraFacing.check(R.id.btn_camera_back)
+        }
+
+        when (prefs.getQualityPreset()) {
+            "low" -> binding.toggleQuality.check(R.id.btn_quality_low)
+            "high" -> binding.toggleQuality.check(R.id.btn_quality_high)
+            else -> binding.toggleQuality.check(R.id.btn_quality_medium)
+        }
+
+        binding.switchStun.isChecked = prefs.isStunFallbackEnabled()
+
         binding.editTextIp.addTextChangedListener {
             if (binding.textInputIp.error != null) {
                 binding.textInputIp.error = null
@@ -60,6 +74,17 @@ class SettingsFragment : Fragment() {
 
             prefs.saveIpAddress(input)
             prefs.saveSignalingToken(token)
+            prefs.setCameraFacing(
+                if (binding.toggleCameraFacing.checkedButtonId == R.id.btn_camera_front) "front" else "back"
+            )
+            prefs.setQualityPreset(
+                when (binding.toggleQuality.checkedButtonId) {
+                    R.id.btn_quality_low -> "low"
+                    R.id.btn_quality_high -> "high"
+                    else -> "medium"
+                }
+            )
+            prefs.setStunFallbackEnabled(binding.switchStun.isChecked)
 
             activity?.onBackPressed()
         }

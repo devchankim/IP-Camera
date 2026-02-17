@@ -7,6 +7,9 @@ class SettingsPreferences(context: Context) {
     companion object {
         private const val IP_KEY = "ip"
         private const val TOKEN_KEY = "signaling_token"
+        private const val CAMERA_FACING_KEY = "camera_facing" // "back" | "front"
+        private const val QUALITY_KEY = "quality" // "low" | "medium" | "high"
+        private const val STUN_FALLBACK_KEY = "stun_fallback" // boolean
     }
 
     private val sharedPreferences =
@@ -31,5 +34,35 @@ class SettingsPreferences(context: Context) {
 
     fun getSignalingToken(): String? {
         return sharedPreferences.getString(TOKEN_KEY, "")
+    }
+
+    fun setCameraFacing(facing: String) {
+        sharedPreferences.edit()
+            .putString(CAMERA_FACING_KEY, facing)
+            .apply()
+    }
+
+    fun getCameraFacing(): String {
+        return sharedPreferences.getString(CAMERA_FACING_KEY, "back") ?: "back"
+    }
+
+    fun setQualityPreset(preset: String) {
+        sharedPreferences.edit()
+            .putString(QUALITY_KEY, preset)
+            .apply()
+    }
+
+    fun getQualityPreset(): String {
+        return sharedPreferences.getString(QUALITY_KEY, "medium") ?: "medium"
+    }
+
+    fun setStunFallbackEnabled(enabled: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(STUN_FALLBACK_KEY, enabled)
+            .apply()
+    }
+
+    fun isStunFallbackEnabled(): Boolean {
+        return sharedPreferences.getBoolean(STUN_FALLBACK_KEY, false)
     }
 }

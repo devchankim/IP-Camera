@@ -5,9 +5,12 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.os.Handler
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -33,6 +36,8 @@ class WebRTCStreamActivity : AppCompatActivity() {
     private lateinit var binding: WebrtcStreamActivityBinding
     private val TAG = "WebRTCStreamTag"
 
+    private var eglBase: EglBase? = null
+
     // WebRTC
     private lateinit var peerConnectionFactory: PeerConnectionFactory
     private var peerConnection: PeerConnection? = null
@@ -44,6 +49,15 @@ class WebRTCStreamActivity : AppCompatActivity() {
     private var signalingClient: WebSocketClient? = null
     private val roomName = "baby"
     private var signalingToken = ""
+    private var signalingServerAddress: String = ""
+    private var reconnectAttempts = 0
+    private val maxReconnectAttempts = 5
+    private val reconnectHandler = Handler(Looper.getMainLooper())
+    private var userStopped = false
+    private var sessionActive = false
+    private var allowStunFallback = false
+    private var cameraFacingPref = "back"
+    private var qualityPref = "medium"
 
     // Foreground service
     private var streamingService: StreamingForegroundService? = null
@@ -86,11 +100,28 @@ class WebRTCStreamActivity : AppCompatActivity() {
         val prefs = SettingsPreferences(applicationContext)
         val serverAddress = prefs.getIpAddress() ?: "192.168.0.101:8081"
         signalingToken = prefs.getSignalingToken() ?: ""
+        allowStunFallback = prefs.isStunFallbackEnabled()
+        cameraFacingPref = prefs.getCameraFacing()
+        qualityPref = prefs.getQualityPreset()
+        signalingServerAddress = serverAddress
 
         binding.tvStatus.text = "Status: Not connected"
 
+        binding.btnBack.setOnClickListener {
+            // Ensure resources are released before leaving.
+            if (sessionActive) stopStream()
+            finish()
+        }
+
+        binding.btnMute.isEnabled = false
+        binding.btnMute.setOnClickListener {
+            val enabled = localAudioTrack?.enabled() ?: true
+            localAudioTrack?.setEnabled(!enabled)
+            binding.btnMute.text = if (enabled) "Unmute" else "Mute"
+        }
+
         binding.btnToggle.setOnClickListener {
-            if (peerConnection != null) {
+            if (sessionActive) {
                 stopStream()
             } else {
                 if (checkPermissions()) {
@@ -128,6 +159,11 @@ class WebRTCStreamActivity : AppCompatActivity() {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 val prefs = SettingsPreferences(applicationContext)
                 val serverAddress = prefs.getIpAddress() ?: "192.168.0.101:8081"
+                signalingToken = prefs.getSignalingToken() ?: ""
+                allowStunFallback = prefs.isStunFallbackEnabled()
+                cameraFacingPref = prefs.getCameraFacing()
+                qualityPref = prefs.getQualityPreset()
+                signalingServerAddress = serverAddress
                 startStream(serverAddress)
             } else {
                 Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show()
@@ -136,7 +172,12 @@ class WebRTCStreamActivity : AppCompatActivity() {
     }
 
     private fun startStream(serverAddress: String) {
-        binding.tvStatus.text = "Initializing WebRTC..."
+        sessionActive = true
+        binding.btnToggle.text = "Stop"
+        binding.tvStatus.text = "Starting..."
+        userStopped = false
+        reconnectAttempts = 0
+        signalingServerAddress = serverAddress
 
         // Start foreground service
         val serviceIntent = Intent(this, StreamingForegroundService::class.java)
@@ -148,6 +189,7 @@ class WebRTCStreamActivity : AppCompatActivity() {
         bindService(serviceIntent, serviceConnection, BIND_AUTO_CREATE)
 
         // Initialize WebRTC
+        eglBase = EglBase.create()
         val initOptions = PeerConnectionFactory.InitializationOptions.builder(this)
             .setEnableInternalTracer(false)
             .createInitializationOptions()
@@ -155,11 +197,11 @@ class WebRTCStreamActivity : AppCompatActivity() {
 
         val options = PeerConnectionFactory.Options()
         val encoderFactory = DefaultVideoEncoderFactory(
-            EglBase.create().eglBaseContext,
-            enableIntelVp8Encoder = true,
-            enableH264HighProfile = true
+            eglBase!!.eglBaseContext,
+            true,
+            true
         )
-        val decoderFactory = DefaultVideoDecoderFactory(EglBase.create().eglBaseContext)
+        val decoderFactory = DefaultVideoDecoderFactory(eglBase!!.eglBaseContext)
 
         peerConnectionFactory = PeerConnectionFactory.builder()
             .setOptions(options)
@@ -168,16 +210,24 @@ class WebRTCStreamActivity : AppCompatActivity() {
             .createPeerConnectionFactory()
 
         // Video capturer (front camera)
-        videoCapturer = createCameraCapturer(Camera2Enumerator(this))
+        videoCapturer = createCameraCapturer(Camera2Enumerator(this), cameraFacingPref)
         if (videoCapturer == null) {
             Toast.makeText(this, "Failed to open camera", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", EglBase.create().eglBaseContext)
+        val surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", eglBase!!.eglBaseContext)
         val videoSource = peerConnectionFactory.createVideoSource(videoCapturer!!.isScreencast)
         videoCapturer!!.initialize(surfaceTextureHelper, this, videoSource.capturerObserver)
-        videoCapturer!!.startCapture(640, 480, 24)
+
+        val powerManager = getSystemService(PowerManager::class.java)
+        val effectivePreset = if (powerManager?.isPowerSaveMode == true) "low" else qualityPref
+        val (w, h, fps) = when (effectivePreset) {
+            "low" -> Triple(480, 360, 15)
+            "high" -> Triple(1280, 720, 30)
+            else -> Triple(640, 480, 24)
+        }
+        videoCapturer!!.startCapture(w, h, fps)
 
         localVideoTrack = peerConnectionFactory.createVideoTrack("video0", videoSource)
         localVideoTrack?.setEnabled(true)
@@ -187,28 +237,37 @@ class WebRTCStreamActivity : AppCompatActivity() {
         val audioSource = peerConnectionFactory.createAudioSource(audioConstraints)
         localAudioTrack = peerConnectionFactory.createAudioTrack("audio0", audioSource)
         localAudioTrack?.setEnabled(true)
+        binding.btnMute.text = "Mute"
+        binding.btnMute.isEnabled = true
 
         // Render local preview
-        binding.localView.init(EglBase.create().eglBaseContext, null)
+        binding.localView.init(eglBase!!.eglBaseContext, null)
         localVideoTrack?.addSink(binding.localView)
 
         // Connect to signaling
         connectSignaling(serverAddress)
     }
 
-    private fun createCameraCapturer(enumerator: CameraEnumerator): CameraVideoCapturer? {
-        for (deviceName in enumerator.deviceNames) {
-            if (enumerator.isFrontFacing(deviceName)) {
-                return enumerator.createCapturer(deviceName, null)
+    private fun createCameraCapturer(
+        enumerator: CameraEnumerator,
+        preferredFacing: String
+    ): CameraVideoCapturer? {
+        val wantBack = preferredFacing != "front"
+
+        fun tryFacing(isWanted: (String) -> Boolean): CameraVideoCapturer? {
+            for (deviceName in enumerator.deviceNames) {
+                if (isWanted(deviceName)) {
+                    return enumerator.createCapturer(deviceName, null)
+                }
             }
+            return null
         }
-        // Fallback to back camera
-        for (deviceName in enumerator.deviceNames) {
-            if (enumerator.isBackFacing(deviceName)) {
-                return enumerator.createCapturer(deviceName, null)
-            }
+
+        return if (wantBack) {
+            tryFacing { enumerator.isBackFacing(it) } ?: tryFacing { enumerator.isFrontFacing(it) }
+        } else {
+            tryFacing { enumerator.isFrontFacing(it) } ?: tryFacing { enumerator.isBackFacing(it) }
         }
-        return null
     }
 
     private fun connectSignaling(serverAddress: String) {
@@ -218,6 +277,7 @@ class WebRTCStreamActivity : AppCompatActivity() {
         signalingClient = object : WebSocketClient(uri) {
             override fun onOpen(handshakedata: ServerHandshake?) {
                 Log.d(TAG, "Signaling: connected")
+                reconnectAttempts = 0
                 runOnUiThread {
                     binding.tvStatus.text = "Signaling: connected, joining room..."
                 }
@@ -260,6 +320,10 @@ class WebRTCStreamActivity : AppCompatActivity() {
                 runOnUiThread {
                     binding.tvStatus.text = "Signaling: disconnected"
                 }
+
+                if (!userStopped) {
+                    scheduleReconnect()
+                }
             }
 
             override fun onError(ex: Exception?) {
@@ -267,6 +331,20 @@ class WebRTCStreamActivity : AppCompatActivity() {
             }
         }
         signalingClient?.connect()
+    }
+
+    private fun scheduleReconnect() {
+        if (reconnectAttempts >= maxReconnectAttempts) return
+        reconnectAttempts += 1
+        val delayMs = (1000L * reconnectAttempts * reconnectAttempts).coerceAtMost(10_000L)
+        runOnUiThread {
+            binding.tvStatus.text = "Reconnecting... ($reconnectAttempts/$maxReconnectAttempts)"
+        }
+        reconnectHandler.postDelayed({
+            if (!userStopped) {
+                connectSignaling(signalingServerAddress)
+            }
+        }, delayMs)
     }
 
     private fun onJoined() {
@@ -280,17 +358,34 @@ class WebRTCStreamActivity : AppCompatActivity() {
         runOnUiThread {
             binding.tvStatus.text = "Viewer joined, creating offer..."
         }
-        createPeerConnection()
-        createOffer()
+        try {
+            createPeerConnection()
+            createOffer()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to start WebRTC session", t)
+            runOnUiThread {
+                binding.tvStatus.text = "WebRTC error: ${t.javaClass.simpleName}"
+                Toast.makeText(this, "WebRTC failed: ${t.message}", Toast.LENGTH_LONG).show()
+            }
+            // Don't crash; just stop cleanly.
+            stopStream()
+        }
     }
 
     private fun createPeerConnection() {
-        val rtcConfig = PeerConnection.RTCConfiguration(emptyList()).apply {
-            // P2P on tailnet, no STUN/TURN needed
-            iceTransportsType = PeerConnection.IceTransportsType.ALL
+        val iceServers = if (allowStunFallback) {
+            listOf(
+                PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
+            )
+        } else {
+            emptyList()
+        }
+
+        // Keep RTCConfiguration minimal for broad device compatibility.
+        val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
+            sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
             rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE
-            tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.ENABLED
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
         }
 
@@ -337,6 +432,8 @@ class WebRTCStreamActivity : AppCompatActivity() {
                 Log.d(TAG, "onConnectionChange: $newState")
             }
 
+            override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {}
+            override fun onIceConnectionReceivingChange(receiving: Boolean) {}
             override fun onAddStream(stream: MediaStream?) {}
             override fun onRemoveStream(stream: MediaStream?) {}
             override fun onDataChannel(channel: DataChannel?) {}
@@ -351,10 +448,7 @@ class WebRTCStreamActivity : AppCompatActivity() {
     }
 
     private fun createOffer() {
-        val constraints = MediaConstraints().apply {
-            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"))
-            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
-        }
+        val constraints = MediaConstraints()
 
         peerConnection?.createOffer(object : SdpObserver {
             override fun onCreateSuccess(sdp: SessionDescription?) {
@@ -416,20 +510,65 @@ class WebRTCStreamActivity : AppCompatActivity() {
     }
 
     private fun stopStream() {
-        signalingClient?.close()
+        if (!sessionActive) {
+            binding.btnToggle.text = "Start"
+            return
+        }
+        binding.tvStatus.text = "Stopping..."
+        userStopped = true
+        reconnectHandler.removeCallbacksAndMessages(null)
+        try {
+            signalingClient?.close()
+        } catch (_: Exception) {
+        }
         signalingClient = null
 
-        peerConnection?.close()
+        try {
+            peerConnection?.close()
+        } catch (_: Exception) {
+        }
         peerConnection = null
 
-        videoCapturer?.stopCapture()
-        videoCapturer?.dispose()
+        try {
+            videoCapturer?.stopCapture()
+        } catch (_: Exception) {
+        }
+        try {
+            videoCapturer?.dispose()
+        } catch (_: Exception) {
+        }
         videoCapturer = null
 
-        localVideoTrack?.dispose()
-        localAudioTrack?.dispose()
+        try {
+            localVideoTrack?.dispose()
+        } catch (_: Exception) {
+        }
+        try {
+            localAudioTrack?.dispose()
+        } catch (_: Exception) {
+        }
+        localVideoTrack = null
+        localAudioTrack = null
+        binding.btnMute.isEnabled = false
+        binding.btnMute.text = "Mute"
 
-        binding.localView.release()
+        try {
+            binding.localView.release()
+        } catch (_: Exception) {
+        }
+
+        try {
+            eglBase?.release()
+        } catch (_: Exception) {
+        }
+        eglBase = null
+
+        try {
+            if (::peerConnectionFactory.isInitialized) {
+                peerConnectionFactory.dispose()
+            }
+        } catch (_: Exception) {
+        }
 
         // Stop foreground service
         if (serviceBound) {
@@ -440,10 +579,13 @@ class WebRTCStreamActivity : AppCompatActivity() {
 
         binding.tvStatus.text = "Status: Stopped"
         binding.btnToggle.text = "Start"
+        sessionActive = false
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        stopStream()
+        if (sessionActive) {
+            stopStream()
+        }
     }
 }
