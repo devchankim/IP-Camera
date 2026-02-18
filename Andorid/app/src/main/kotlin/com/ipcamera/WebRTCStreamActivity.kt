@@ -58,6 +58,8 @@ class WebRTCStreamActivity : AppCompatActivity() {
     private var allowStunFallback = false
     private var cameraFacingPref = "back"
     private var qualityPref = "medium"
+    private var remoteDescriptionSet = false
+    private val pendingRemoteIceCandidates = ArrayDeque<IceCandidate>()
 
     // Foreground service
     private var streamingService: StreamingForegroundService? = null
@@ -373,6 +375,8 @@ class WebRTCStreamActivity : AppCompatActivity() {
     }
 
     private fun createPeerConnection() {
+        remoteDescriptionSet = false
+        pendingRemoteIceCandidates.clear()
         val iceServers = if (allowStunFallback) {
             listOf(
                 PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
@@ -488,6 +492,8 @@ class WebRTCStreamActivity : AppCompatActivity() {
         peerConnection?.setRemoteDescription(object : SdpObserver {
             override fun onSetSuccess() {
                 Log.d(TAG, "setRemoteDescription (answer) success")
+                remoteDescriptionSet = true
+                flushPendingRemoteIceCandidates()
             }
 
             override fun onSetFailure(error: String?) {
@@ -500,13 +506,28 @@ class WebRTCStreamActivity : AppCompatActivity() {
     }
 
     private fun onIceCandidate(candidate: JSONObject) {
+        if (peerConnection == null) return
         val iceCandidate = IceCandidate(
             candidate.getString("sdpMid"),
             candidate.getInt("sdpMLineIndex"),
             candidate.getString("candidate")
         )
+        if (!remoteDescriptionSet) {
+            pendingRemoteIceCandidates.add(iceCandidate)
+            Log.d(TAG, "Queued remote ICE candidate")
+            return
+        }
         peerConnection?.addIceCandidate(iceCandidate)
         Log.d(TAG, "Added remote ICE candidate")
+    }
+
+    private fun flushPendingRemoteIceCandidates() {
+        if (!remoteDescriptionSet || peerConnection == null) return
+        while (pendingRemoteIceCandidates.isNotEmpty()) {
+            val candidate = pendingRemoteIceCandidates.removeFirst()
+            peerConnection?.addIceCandidate(candidate)
+            Log.d(TAG, "Added queued remote ICE candidate")
+        }
     }
 
     private fun stopStream() {
@@ -528,6 +549,8 @@ class WebRTCStreamActivity : AppCompatActivity() {
         } catch (_: Exception) {
         }
         peerConnection = null
+        remoteDescriptionSet = false
+        pendingRemoteIceCandidates.clear()
 
         try {
             videoCapturer?.stopCapture()

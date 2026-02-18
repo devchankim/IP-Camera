@@ -168,6 +168,8 @@
         let signalingWs = null;
         let peerConnection = null;
         const roomName = 'baby';
+        let remoteDescriptionSet = false;
+        let pendingRemoteIceCandidates = [];
 
         function setStatus(message, type = 'normal') {
             statusEl.textContent = message;
@@ -276,8 +278,11 @@
         }
 
         function createPeerConnection() {
+            remoteDescriptionSet = false;
+            pendingRemoteIceCandidates = [];
             const config = {
-                iceServers: [] // P2P on tailnet, no STUN/TURN
+                // Browser-side fallback STUN to avoid host-only ICE dead-ends.
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             };
 
             peerConnection = new RTCPeerConnection(config);
@@ -324,6 +329,8 @@
 
             try {
                 await peerConnection.setRemoteDescription({ type: 'offer', sdp });
+                remoteDescriptionSet = true;
+                await flushPendingRemoteIceCandidates();
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
 
@@ -340,16 +347,38 @@
         }
 
         async function handleIceCandidate(candidate) {
-            if (peerConnection) {
+            if (!peerConnection || !remoteDescriptionSet) {
+                pendingRemoteIceCandidates.push(candidate);
+                return;
+            }
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate({
+                    sdpMid: candidate.sdpMid,
+                    sdpMLineIndex: candidate.sdpMLineIndex,
+                    candidate: candidate.candidate
+                }));
+                console.log('Added remote ICE candidate');
+            } catch (error) {
+                console.error('Failed to add ICE candidate:', error);
+            }
+        }
+
+        async function flushPendingRemoteIceCandidates() {
+            if (!peerConnection || !remoteDescriptionSet || pendingRemoteIceCandidates.length === 0) {
+                return;
+            }
+            const queue = pendingRemoteIceCandidates.slice();
+            pendingRemoteIceCandidates = [];
+            for (const candidate of queue) {
                 try {
                     await peerConnection.addIceCandidate(new RTCIceCandidate({
                         sdpMid: candidate.sdpMid,
                         sdpMLineIndex: candidate.sdpMLineIndex,
                         candidate: candidate.candidate
                     }));
-                    console.log('Added remote ICE candidate');
+                    console.log('Added queued remote ICE candidate');
                 } catch (error) {
-                    console.error('Failed to add ICE candidate:', error);
+                    console.error('Failed to add queued ICE candidate:', error);
                 }
             }
         }
@@ -365,6 +394,8 @@
                 peerConnection = null;
             }
 
+            remoteDescriptionSet = false;
+            pendingRemoteIceCandidates = [];
             remoteVideo.srcObject = null;
             setStatus('Disconnected');
             settingsPanel.classList.remove('hidden');
