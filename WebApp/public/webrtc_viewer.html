@@ -2,174 +2,186 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IP Camera WebRTC Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>IP Camera — Live</title>
     <link rel="stylesheet" href="style.css">
     <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100dvh;
+            padding: env(safe-area-inset-top, 16px) 0 env(safe-area-inset-bottom, 16px);
+        }
+
         .viewer-shell {
-            width: min(980px, 94vw);
-            margin: 0 auto;
-            padding: 24px 0 42px;
+            width: min(820px, 94vw);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 28px 0 40px;
         }
 
-        .viewer-header {
-            text-align: center;
-            margin-bottom: 18px;
+        .viewer-header { text-align: center; }
+
+        .viewer-title {
+            margin: 0;
+            font-size: clamp(32px, 7vw, 48px);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #1d1d1f 30%, rgba(0, 122, 255, 0.8));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
-        .viewer-card {
-            padding: 22px;
+        .viewer-subtitle {
+            margin: 6px 0 0;
+            font-size: 15px;
+            color: var(--ios-text-2);
+            letter-spacing: -0.01em;
         }
 
         .status-row {
             display: flex;
             justify-content: center;
-            margin: 0 0 14px;
         }
 
-        .settings-grid {
-            display: grid;
-            gap: 12px;
-            grid-template-columns: 1fr;
-            margin-bottom: 14px;
+        .settings-card {
+            width: 100%;
+            padding: 24px;
         }
+
+        .field-group { display: flex; flex-direction: column; gap: 14px; }
+        .field-wrap  { display: flex; flex-direction: column; gap: 7px; }
 
         .field-label {
-            display: block;
             font-size: 13px;
-            color: var(--apple-text-subtle);
-            margin-bottom: 6px;
             font-weight: 600;
+            color: var(--ios-text-2);
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
         }
 
-        .field-input {
-            width: 100%;
-            border: 1px solid var(--apple-border);
-            background: var(--apple-surface-soft);
-            border-radius: 12px;
-            padding: 12px 14px;
-            font-size: 15px;
-            color: var(--apple-text);
-        }
-
-        .field-input:focus {
-            outline: none;
-            border-color: var(--apple-primary);
-            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
-        }
-
-        .actions {
+        .actions-row {
             display: flex;
             gap: 10px;
+            margin-top: 20px;
             flex-wrap: wrap;
-            margin-bottom: 14px;
         }
 
-        .primary-btn,
-        .secondary-btn {
-            border: 1px solid transparent;
-            border-radius: 12px;
-            min-height: 44px;
-            font-size: 15px;
-            font-weight: 600;
-            padding: 0 18px;
-            cursor: pointer;
-        }
+        .actions-row .btn { flex: 1; min-width: 120px; }
 
-        .primary-btn {
-            background: var(--apple-primary);
-            color: #fff;
-        }
-
-        .primary-btn:hover {
-            background: var(--apple-primary-hover);
-        }
-
-        .primary-btn:disabled {
-            background: #b9c8db;
-            cursor: not-allowed;
-        }
-
-        .secondary-btn {
-            background: #fff;
-            border-color: #c7c7cc;
-            color: #1d1d1f;
-        }
-
-        .secondary-btn:hover {
-            border-color: #9fa2a8;
-            background: #fafafa;
-        }
-
+        /* Video */
         .video-wrap {
-            position: relative;
             width: 100%;
+            position: relative;
             background: #000;
-            border-radius: 16px;
+            border-radius: var(--r-xl);
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.30),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.15);
         }
 
         #remote-video {
             width: 100%;
             display: block;
             background: #000;
-            min-height: min(56vw, 260px);
+            min-height: min(52vw, 280px);
+            border-radius: var(--r-xl);
         }
+
+        /* Floating overlay controls */
+        .video-overlay {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            padding: 20px 18px 18px;
+            background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%);
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            gap: 10px;
+            border-radius: 0 0 var(--r-xl) var(--r-xl);
+        }
+
+        .overlay-btn {
+            background: rgba(20, 20, 20, 0.55);
+            backdrop-filter: blur(16px) saturate(160%);
+            -webkit-backdrop-filter: blur(16px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: var(--r-pill);
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 9px 18px;
+            cursor: pointer;
+            letter-spacing: -0.01em;
+            transition: transform 0.14s ease, background 0.14s ease;
+            -webkit-appearance: none;
+        }
+
+        .overlay-btn:active { transform: scale(0.95); }
+        .overlay-btn:hover  { background: rgba(40, 40, 40, 0.70); }
 
         .hint {
-            margin-top: 10px;
             font-size: 13px;
-            color: var(--apple-text-subtle);
+            color: var(--ios-text-3);
             text-align: center;
+            letter-spacing: -0.01em;
         }
 
-        @media (max-width: 700px) {
-            .viewer-card {
-                padding: 18px;
-            }
-
-            .actions {
-                display: grid;
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 680px) {
+            .viewer-shell  { gap: 16px; padding: 18px 0 32px; }
+            .settings-card { padding: 18px; }
+            .actions-row   { flex-direction: column; }
         }
     </style>
 </head>
 <body>
     <main class="viewer-shell">
+
         <header class="viewer-header">
-            <h1 class="page-title">WebRTC Live Viewer</h1>
-            <p class="page-subtitle">Low-latency video + audio streaming for mobile browsers.</p>
+            <h1 class="viewer-title">Live View</h1>
+            <p class="viewer-subtitle">WebRTC · Low-latency · Secure</p>
         </header>
 
-        <section class="app-card viewer-card">
-            <div class="status-row">
-                <div id="status" class="status-chip">Not connected</div>
-            </div>
+        <div class="status-row">
+            <div id="status" class="status-chip">Not connected</div>
+        </div>
 
-            <div id="settings-panel" class="settings-grid">
-                <div>
-                    <label class="field-label" for="server-input">Signaling Server (IP:Port)</label>
-                    <input class="field-input" type="text" id="server-input" placeholder="192.168.0.101:8081" value="192.168.0.101:8081">
+        <div id="settings-panel" class="app-card settings-card">
+            <div class="field-group">
+                <div class="field-wrap">
+                    <label class="field-label" for="server-input">Signaling Server</label>
+                    <input class="glass-input" type="text" id="server-input"
+                           placeholder="100.x.x.x:8081" autocorrect="off"
+                           autocapitalize="none" spellcheck="false">
                 </div>
-                <div>
-                    <label class="field-label" for="token-input">Signaling Token</label>
-                    <input class="field-input" type="password" id="token-input" placeholder="Enter your token">
+                <div class="field-wrap">
+                    <label class="field-label" for="token-input">Access Token</label>
+                    <input class="glass-input" type="password" id="token-input"
+                           placeholder="Enter token">
                 </div>
             </div>
-
-            <div class="actions">
-                <button id="connect-btn" class="primary-btn">Connect</button>
-                <button id="disconnect-btn" class="secondary-btn" style="display:none;">Disconnect</button>
-                <button id="retry-audio-btn" class="secondary-btn" style="display:none;">Retry Audio</button>
+            <div class="actions-row">
+                <button id="connect-btn" class="btn btn-primary">Connect</button>
             </div>
+        </div>
 
-            <div class="video-wrap">
-                <video id="remote-video" autoplay playsinline controls></video>
+        <div class="video-wrap" id="video-section" style="display:none;">
+            <video id="remote-video" autoplay playsinline controls></video>
+            <div class="video-overlay">
+                <button id="retry-audio-btn" class="overlay-btn" style="display:none;">Retry Audio</button>
+                <button id="disconnect-btn" class="overlay-btn">Disconnect</button>
             </div>
-            <p class="hint">If audio does not start automatically, tap Retry Audio once.</p>
-        </section>
+        </div>
+
+        <p class="hint" id="hint-text" style="display:none;">
+            If audio does not start automatically, tap Retry Audio once.
+        </p>
+
     </main>
 
     <script>
@@ -180,6 +192,8 @@
         const disconnectBtn = document.getElementById("disconnect-btn");
         const retryAudioBtn = document.getElementById("retry-audio-btn");
         const settingsPanel = document.getElementById("settings-panel");
+        const videoSection = document.getElementById("video-section");
+        const hintText = document.getElementById("hint-text");
         const serverInput = document.getElementById("server-input");
         const tokenInput = document.getElementById("token-input");
 
@@ -202,6 +216,11 @@
             retryAudioBtn.style.display = "none";
         }
 
+        function showVideo(show) {
+            videoSection.style.display = show ? "" : "none";
+            hintText.style.display = show ? "" : "none";
+        }
+
         function closePeerConnection() {
             if (peerConnection) {
                 peerConnection.close();
@@ -219,7 +238,6 @@
                 signalingWs.close();
                 signalingWs = null;
             }
-
             closePeerConnection();
             ownClientId = "";
             cameraClientId = "";
@@ -227,31 +245,24 @@
                 setStatus("Disconnected");
             }
             settingsPanel.style.display = "";
-            disconnectBtn.style.display = "none";
+            showVideo(false);
             connectBtn.disabled = false;
         }
 
         connectBtn.addEventListener("click", async () => {
             const server = serverInput.value.trim();
             const token = tokenInput.value.trim();
-
             if (!server || !token) {
                 setError("Please enter server address and token");
                 return;
             }
-
             localStorage.setItem("signaling_server", server);
             localStorage.setItem("signaling_token", token);
             await connect(server, token);
         });
 
-        disconnectBtn.addEventListener("click", () => {
-            disconnect(true);
-        });
-
-        retryAudioBtn.addEventListener("click", () => {
-            ensurePlayback(true);
-        });
+        disconnectBtn.addEventListener("click", () => { disconnect(true); });
+        retryAudioBtn.addEventListener("click", () => { ensurePlayback(true); });
 
         async function connect(server, token) {
             disconnect(false);
@@ -265,10 +276,7 @@
                 signalingWs.onopen = () => {
                     setStatus("Signaling connected, joining room...");
                     signalingWs.send(JSON.stringify({
-                        type: "join",
-                        room: roomName,
-                        role: "viewer",
-                        token
+                        type: "join", room: roomName, role: "viewer", token
                     }));
                 };
 
@@ -279,9 +287,8 @@
                             ownClientId = msg.clientId || "";
                             setStatus("Joined room, waiting for camera...");
                             settingsPanel.style.display = "none";
-                            disconnectBtn.style.display = "inline-flex";
+                            showVideo(true);
                             break;
-
                         case "peer_joined":
                             if (msg.role === "camera") {
                                 cameraClientId = msg.clientId || "";
@@ -289,7 +296,6 @@
                                 ensurePeerConnection();
                             }
                             break;
-
                         case "peer_left":
                             if (msg.role === "camera") {
                                 setStatus("Camera disconnected, waiting for reconnect...");
@@ -297,15 +303,12 @@
                                 cameraClientId = "";
                             }
                             break;
-
                         case "offer":
                             await handleOffer(msg.sdp, msg.from || "");
                             break;
-
                         case "ice":
                             await handleIceCandidate(msg.candidate, msg.from || "");
                             break;
-
                         case "error":
                             setError(`Server error: ${msg.message}`);
                             disconnect(false);
@@ -332,9 +335,7 @@
         }
 
         function ensurePeerConnection() {
-            if (peerConnection) {
-                return;
-            }
+            if (peerConnection) return;
             remoteDescriptionSet = false;
             pendingRemoteIceCandidates = [];
             peerConnection = new RTCPeerConnection({
@@ -342,14 +343,10 @@
             });
 
             peerConnection.onicecandidate = (event) => {
-                if (!event.candidate || !cameraClientId) {
-                    return;
-                }
+                if (!event.candidate || !cameraClientId) return;
                 if (signalingWs && signalingWs.readyState === WebSocket.OPEN) {
                     signalingWs.send(JSON.stringify({
-                        type: "ice",
-                        room: roomName,
-                        to: cameraClientId,
+                        type: "ice", room: roomName, to: cameraClientId,
                         candidate: {
                             sdpMid: event.candidate.sdpMid,
                             sdpMLineIndex: event.candidate.sdpMLineIndex,
@@ -368,9 +365,7 @@
             };
 
             peerConnection.oniceconnectionstatechange = () => {
-                if (!peerConnection) {
-                    return;
-                }
+                if (!peerConnection) return;
                 const state = peerConnection.iceConnectionState;
                 if (state === "failed" || state === "disconnected") {
                     setError("Connection lost");
@@ -378,9 +373,7 @@
             };
 
             peerConnection.onconnectionstatechange = () => {
-                if (!peerConnection) {
-                    return;
-                }
+                if (!peerConnection) return;
                 if (peerConnection.connectionState === "connected") {
                     setStatus("Streaming", "connected");
                 }
@@ -388,25 +381,16 @@
         }
 
         async function handleOffer(sdp, fromClientId) {
-            if (fromClientId) {
-                cameraClientId = fromClientId;
-            }
-            if (!peerConnection) {
-                ensurePeerConnection();
-            }
+            if (fromClientId) cameraClientId = fromClientId;
+            if (!peerConnection) ensurePeerConnection();
             try {
                 await peerConnection.setRemoteDescription({ type: "offer", sdp });
                 remoteDescriptionSet = true;
                 await flushPendingRemoteIceCandidates();
-
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
-
                 signalingWs.send(JSON.stringify({
-                    type: "answer",
-                    room: roomName,
-                    to: cameraClientId,
-                    sdp: answer.sdp
+                    type: "answer", room: roomName, to: cameraClientId, sdp: answer.sdp
                 }));
                 setStatus("Connected, waiting for media...");
             } catch (error) {
@@ -415,9 +399,7 @@
         }
 
         async function handleIceCandidate(candidate, fromClientId) {
-            if (fromClientId) {
-                cameraClientId = fromClientId;
-            }
+            if (fromClientId) cameraClientId = fromClientId;
             if (!peerConnection || !remoteDescriptionSet) {
                 pendingRemoteIceCandidates.push(candidate);
                 return;
@@ -434,12 +416,9 @@
         }
 
         async function flushPendingRemoteIceCandidates() {
-            if (!peerConnection || !remoteDescriptionSet || pendingRemoteIceCandidates.length === 0) {
-                return;
-            }
+            if (!peerConnection || !remoteDescriptionSet || pendingRemoteIceCandidates.length === 0) return;
             const queue = pendingRemoteIceCandidates.slice();
             pendingRemoteIceCandidates = [];
-
             for (const candidate of queue) {
                 try {
                     await peerConnection.addIceCandidate(new RTCIceCandidate({
@@ -454,9 +433,7 @@
         }
 
         function ensurePlayback(userTriggered) {
-            if (!remoteVideo.srcObject) {
-                return;
-            }
+            if (!remoteVideo.srcObject) return;
             remoteVideo.muted = false;
             const playPromise = remoteVideo.play();
             if (playPromise && typeof playPromise.then === "function") {
@@ -476,13 +453,9 @@
 
         window.addEventListener("load", () => {
             const savedServer = localStorage.getItem("signaling_server");
-            const savedToken = localStorage.getItem("signaling_token");
-            if (savedServer) {
-                serverInput.value = savedServer;
-            }
-            if (savedToken) {
-                tokenInput.value = savedToken;
-            }
+            const savedToken  = localStorage.getItem("signaling_token");
+            if (savedServer) serverInput.value = savedServer;
+            if (savedToken)  tokenInput.value  = savedToken;
         });
     </script>
 </body>

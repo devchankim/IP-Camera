@@ -1,116 +1,234 @@
+/* =========================================================
+   iOS / iPadOS 26 — Liquid Glass Design System
+   ========================================================= */
+
 :root {
-    --apple-bg: #f5f5f7;
-    --apple-surface: #ffffff;
-    --apple-surface-soft: #fbfbfd;
-    --apple-text: #1d1d1f;
-    --apple-text-subtle: #6e6e73;
-    --apple-border: #e5e5ea;
-    --apple-primary: #007aff;
-    --apple-primary-hover: #0063cc;
-    --apple-success-bg: #dff7e8;
-    --apple-success-text: #0c6a3a;
-    --apple-error-bg: #ffe7e8;
-    --apple-error-text: #b42328;
-    --apple-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
-    --apple-radius-lg: 20px;
-    --apple-radius-md: 14px;
+    /* System colours */
+    --ios-blue:        #007aff;
+    --ios-blue-dark:   #0051d5;
+    --ios-green:       #30d158;
+    --ios-red:         #ff3b30;
+    --ios-text:        #1d1d1f;
+    --ios-text-2:      rgba(60, 60, 67, 0.60);
+    --ios-text-3:      rgba(60, 60, 67, 0.30);
+    --ios-separator:   rgba(60, 60, 67, 0.12);
+
+    /* Glass tokens */
+    --glass-white-bg:       rgba(255, 255, 255, 0.52);
+    --glass-white-border:   rgba(255, 255, 255, 0.72);
+    --glass-white-hi:       rgba(255, 255, 255, 0.80);   /* top highlight */
+    --glass-blur:           blur(28px) saturate(200%);
+    --glass-shadow:         0 12px 40px rgba(0, 0, 0, 0.10),
+                            inset 0 1px 0 var(--glass-white-hi);
+
+    /* Blue glass */
+    --glass-blue-bg:        rgba(0, 122, 255, 0.82);
+    --glass-blue-border:    rgba(120, 180, 255, 0.55);
+    --glass-blue-hi:        rgba(180, 220, 255, 0.45);
+    --glass-blue-shadow:    0 6px 20px rgba(0, 122, 255, 0.35),
+                            inset 0 1px 0 var(--glass-blue-hi);
+
+    /* Radii */
+    --r-xl:   28px;
+    --r-lg:   20px;
+    --r-md:   16px;
+    --r-sm:   12px;
+    --r-pill: 999px;
 }
 
-*,
-*::before,
-*::after {
+/* ── Reset ── */
+*, *::before, *::after {
     box-sizing: border-box;
-    /* No external font fetches (offline/private). */
-    font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-family: system-ui, -apple-system, "SF Pro Display",
+                 "Helvetica Neue", Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
 }
 
+/* ── Background mesh gradient ── */
 body {
     margin: 0;
-    min-height: 100vh;
-    color: var(--apple-text);
-    background: radial-gradient(circle at top, #ffffff 0%, var(--apple-bg) 55%, #ececf0 100%);
+    min-height: 100dvh;
+    color: var(--ios-text);
+    background:
+        radial-gradient(ellipse 65% 55% at 12% 18%,
+                        rgba(96,  165, 250, 0.50) 0%, transparent 100%),
+        radial-gradient(ellipse 60% 50% at 88% 82%,
+                        rgba(167, 139, 250, 0.48) 0%, transparent 100%),
+        radial-gradient(ellipse 70% 60% at 55% 48%,
+                        rgba(251, 207, 232, 0.30) 0%, transparent 100%),
+        #eef2ff;
 }
 
-a {
-    color: inherit;
-}
+a { color: inherit; text-decoration: none; }
 
+/* ── Shell ── */
 .app-shell {
     width: min(960px, 92vw);
     margin: 0 auto;
-    padding: 24px 0 48px;
+    padding: 28px 0 56px;
 }
 
+/* ── Glass card ── */
 .app-card {
-    background: var(--apple-surface);
-    border: 1px solid var(--apple-border);
-    border-radius: var(--apple-radius-lg);
-    box-shadow: var(--apple-shadow);
+    background: var(--glass-white-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-white-border);
+    border-bottom-color: rgba(255, 255, 255, 0.35);
+    border-radius: var(--r-xl);
+    box-shadow: var(--glass-shadow);
 }
 
+/* ── Page header ── */
 .page-header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .page-title {
     margin: 0;
-    font-size: clamp(32px, 5vw, 50px);
-    letter-spacing: -0.02em;
+    font-size: clamp(34px, 6vw, 52px);
     font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--ios-text);
 }
 
 .page-subtitle {
     margin: 8px 0 0;
-    color: var(--apple-text-subtle);
     font-size: 16px;
+    color: var(--ios-text-2);
+    letter-spacing: -0.01em;
 }
 
+/* ── Status chip — glass pill ── */
 .status-chip {
-    display: inline-block;
-    padding: 10px 16px;
-    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: var(--r-pill);
     font-size: 14px;
     font-weight: 600;
-    background: #eceef4;
-    color: #475467;
+    letter-spacing: -0.01em;
+    background: rgba(120, 120, 128, 0.18);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    color: var(--ios-text-2);
+    transition: background 0.25s ease, color 0.25s ease;
+}
+
+.status-chip::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(120, 120, 128, 0.5);
+    flex-shrink: 0;
+    transition: background 0.25s ease;
 }
 
 .status-chip.connected {
-    background: var(--apple-success-bg);
-    color: var(--apple-success-text);
+    background: rgba(48, 209, 88, 0.20);
+    border-color: rgba(48, 209, 88, 0.45);
+    color: #0a6b30;
+}
+
+.status-chip.connected::before {
+    background: var(--ios-green);
+    box-shadow: 0 0 6px rgba(48, 209, 88, 0.7);
 }
 
 .status-chip.error {
-    background: var(--apple-error-bg);
-    color: var(--apple-error-text);
+    background: rgba(255, 59, 48, 0.16);
+    border-color: rgba(255, 59, 48, 0.40);
+    color: #b42328;
 }
 
-md-filled-button {
-    --md-filled-button-container-shape: 12px;
-    --md-filled-button-container-height: 48px;
-    --md-filled-button-label-text-size: 16px;
-    --md-filled-button-label-text-weight: 600;
-    --md-filled-button-container-color: var(--apple-primary);
-    --md-filled-button-label-text-color: #ffffff;
+.status-chip.error::before {
+    background: var(--ios-red);
 }
 
-md-outlined-button {
-    --md-outlined-button-outline-color: #c7c7cc;
-    --md-outlined-button-outline-width: 1px;
-    --md-outlined-button-container-height: 48px;
-    --md-outlined-button-container-shape: 12px;
-    --md-outlined-button-label-text-size: 16px;
-    --md-outlined-button-label-text-weight: 600;
+/* ── Glass input ── */
+.glass-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.60);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: var(--r-md);
+    padding: 13px 16px;
+    font-size: 16px;
+    color: var(--ios-text);
+    outline: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    -webkit-appearance: none;
 }
 
-md-filled-button:hover {
-    --md-filled-button-container-color: var(--apple-primary-hover);
+.glass-input::placeholder { color: var(--ios-text-3); }
+
+.glass-input:focus {
+    border-color: var(--ios-blue);
+    box-shadow: 0 0 0 3.5px rgba(0, 122, 255, 0.20);
 }
 
-@media (max-width: 700px) {
+/* ── Glass buttons ── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: none;
+    border-radius: var(--r-pill);
+    min-height: 48px;
+    padding: 0 22px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease;
+    -webkit-appearance: none;
+    white-space: nowrap;
+}
+
+.btn:active { transform: scale(0.96); }
+
+.btn-primary {
+    background: var(--glass-blue-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-blue-border);
+    color: #ffffff;
+    box-shadow: var(--glass-blue-shadow);
+}
+
+.btn-primary:hover  { background: rgba(0, 122, 255, 0.92); }
+.btn-primary:disabled {
+    background: rgba(120, 120, 128, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: none;
+    color: rgba(60, 60, 67, 0.4);
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-secondary {
+    background: var(--glass-white-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-white-border);
+    color: var(--ios-text);
+    box-shadow: var(--glass-shadow);
+}
+
+.btn-secondary:hover { background: rgba(255, 255, 255, 0.68); }
+
+/* ── Responsive ── */
+@media (max-width: 680px) {
     .app-shell {
-        width: min(520px, 94vw);
-        padding-top: 18px;
+        width: min(560px, 94vw);
+        padding-top: 20px;
     }
+    .btn { min-height: 44px; font-size: 15px; }
 }

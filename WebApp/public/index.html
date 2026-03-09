@@ -1,143 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>IP Camera</title>
-
     <link rel="stylesheet" href="style.css">
-
-    <script src="bundle.js"></script>
-
     <style>
-        .home-card {
-            padding: 28px 24px;
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100dvh;
+            padding: env(safe-area-inset-top, 16px) 0 env(safe-area-inset-bottom, 16px);
         }
 
-        .action-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+        .home-shell {
+            width: min(540px, 94vw);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 40px 0 56px;
+        }
+
+        .hero { text-align: center; }
+
+        .hero-icon {
+            font-size: 56px;
+            line-height: 1;
+            margin-bottom: 12px;
+            display: block;
+            filter: drop-shadow(0 4px 12px rgba(0, 122, 255, 0.25));
+        }
+
+        .hero-title {
+            margin: 0;
+            font-size: clamp(34px, 8vw, 52px);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #1d1d1f 20%, rgba(0, 122, 255, 0.85));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            margin: 8px 0 0;
+            font-size: 16px;
+            color: var(--ios-text-2);
+            letter-spacing: -0.01em;
+        }
+
+        .home-card { padding: 0; overflow: hidden; }
+
+        .section-row {
+            padding: 20px 22px;
+            display: flex;
+            flex-direction: column;
             gap: 12px;
-            margin-top: 16px;
         }
 
-        .action-grid md-filled-button,
-        .action-grid md-outlined-button {
-            width: 100%;
+        .section-row + .section-row {
+            border-top: 1px solid var(--ios-separator);
         }
 
         .section-title {
             margin: 0;
-            font-size: 18px;
+            font-size: 17px;
+            font-weight: 600;
             letter-spacing: -0.01em;
         }
 
-        .section-subtitle {
-            margin: 6px 0 0;
-            color: var(--apple-text-subtle);
-            font-size: 14px;
+        .section-desc {
+            margin: 3px 0 0;
+            font-size: 13px;
+            color: var(--ios-text-2);
         }
 
-        .section + .section {
-            margin-top: 24px;
-            padding-top: 20px;
-            border-top: 1px solid var(--apple-border);
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
         }
 
-        #auth-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-top: 12px;
-        }
+        .btn-grid .btn { width: 100%; justify-content: center; }
 
-        #auth-container md-filled-button,
-        #auth-container md-outlined-button {
-            width: calc(50% - 6px);
-            min-width: 130px;
-        }
-
-        #logout_button {
-            width: 100%;
-        }
-
-        .hero {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-
-        @media (max-width: 760px) {
-            .action-grid {
-                grid-template-columns: 1fr;
-            }
-
-            #auth-container md-filled-button,
-            #auth-container md-outlined-button {
-                width: 100%;
-            }
+        @media (max-width: 400px) {
+            .btn-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
-
 <body>
-<main class="app-shell">
+<main class="home-shell">
+
     <header class="hero">
-        <h1 class="page-title">IP Camera</h1>
-        <p class="page-subtitle">Real-time WebRTC monitoring with clear, mobile-first controls.</p>
+        <span class="hero-icon">&#128247;</span>
+        <h1 class="hero-title">IP Camera</h1>
+        <p class="hero-subtitle">Real-time WebRTC monitoring.</p>
     </header>
 
     <section class="app-card home-card">
-        <div class="section">
-            <h2 class="section-title">Live View</h2>
-            <p class="section-subtitle">Use WebRTC viewer for low-latency video + audio from camera.</p>
-            <div class="action-grid">
-                <md-filled-button href="webrtc_viewer.html">Open WebRTC Viewer</md-filled-button>
-                <md-outlined-button href="settings.html">Open Settings</md-outlined-button>
+
+        <div class="section-row">
+            <div>
+                <h2 class="section-title">Live View</h2>
+                <p class="section-desc">Low-latency video &amp; audio via WebRTC.</p>
+            </div>
+            <div class="btn-grid">
+                <a href="webrtc_viewer.html" class="btn btn-primary">Open Viewer</a>
+                <a href="settings.html"      class="btn btn-secondary">Settings</a>
             </div>
         </div>
 
-        <div class="section">
-            <h2 class="section-title">Media</h2>
-            <p class="section-subtitle">Capture snapshots while streaming and review them in gallery.</p>
-            <div class="action-grid">
-                <md-filled-button href="gallery.html">Open Gallery</md-filled-button>
-                <md-outlined-button href="stream.html">Legacy Stream</md-outlined-button>
+        <div class="section-row">
+            <div>
+                <h2 class="section-title">Media</h2>
+                <p class="section-desc">Capture snapshots and review in gallery.</p>
+            </div>
+            <div class="btn-grid">
+                <a href="gallery.html" class="btn btn-primary">Gallery</a>
+                <a href="stream.html"  class="btn btn-secondary">Legacy Stream</a>
             </div>
         </div>
 
-        <div class="section">
-            <h2 class="section-title">Account</h2>
-            <p class="section-subtitle">Sign in for screenshot and gallery features.</p>
-            <div id="auth-container">
-                <md-filled-button id="login_button" href="login.html">Login</md-filled-button>
-                <md-outlined-button id="register_button" href="register.html">Register</md-outlined-button>
-                <md-filled-button id="logout_button">Logout</md-filled-button>
+        <div class="section-row">
+            <div>
+                <h2 class="section-title">Account</h2>
+                <p class="section-desc">Sign in for screenshot &amp; gallery features.</p>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <div id="auth-container" style="display:flex; gap:10px;">
+                    <a href="login.html"    id="login_button"    class="btn btn-primary"   style="flex:1; justify-content:center;">Login</a>
+                    <a href="register.html" id="register_button" class="btn btn-secondary" style="flex:1; justify-content:center;">Register</a>
+                </div>
+                <button id="logout_button" class="btn btn-secondary" style="display:none; width:100%;">Logout</button>
             </div>
         </div>
+
     </section>
+
 </main>
+
 <script src="common.js"></script>
 <script>
-    const logoutButton = document.getElementById('logout_button');
-    const loginButton = document.getElementById('login_button');
+    const logoutButton   = document.getElementById('logout_button');
+    const loginButton    = document.getElementById('login_button');
     const registerButton = document.getElementById('register_button');
+    const authContainer  = document.getElementById('auth-container');
 
     if (getAuthorization() === '') {
         logoutButton.style.display = 'none';
     } else {
-        loginButton.style.display = 'none';
-        registerButton.style.display = 'none';
+        authContainer.style.display = 'none';
+        logoutButton.style.display = '';
     }
 
     logoutButton.addEventListener('click', () => {
         clearAuthorization();
         logoutButton.style.display = 'none';
-        loginButton.style.display = '';
-        registerButton.style.display = '';
+        authContainer.style.display = 'flex';
     });
-
 </script>
 </body>
 </html>
