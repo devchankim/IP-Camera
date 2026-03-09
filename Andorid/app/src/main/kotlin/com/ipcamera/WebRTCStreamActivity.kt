@@ -249,8 +249,10 @@ class WebRTCStreamActivity : AppCompatActivity() {
         binding.btnMute.text = "Mute"
         binding.btnMute.isEnabled = true
 
-        // Render local preview
+        // Render local preview (landscape: no mirror for back cam, fill frame)
         binding.localView.init(eglBase!!.eglBaseContext, null)
+        binding.localView.setMirror(cameraFacingPref == "front")
+        binding.localView.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
         localVideoTrack?.addSink(binding.localView)
 
         // Connect to signaling
