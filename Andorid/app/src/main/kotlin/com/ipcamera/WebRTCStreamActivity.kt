@@ -23,6 +23,7 @@ import org.java_websocket.handshake.ServerHandshake
 import org.json.JSONObject
 import org.webrtc.*
 import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * WebRTC Camera (offerer) Activity
@@ -40,10 +41,10 @@ class WebRTCStreamActivity : AppCompatActivity() {
 
     // WebRTC
     private lateinit var peerConnectionFactory: PeerConnectionFactory
-    private var peerConnection: PeerConnection? = null
     private var localVideoTrack: VideoTrack? = null
     private var localAudioTrack: AudioTrack? = null
     private var videoCapturer: CameraVideoCapturer? = null
+    private val peerSessions = ConcurrentHashMap<String, PeerSession>()
 
     // Signaling
     private var signalingClient: WebSocketClient? = null
@@ -58,8 +59,7 @@ class WebRTCStreamActivity : AppCompatActivity() {
     private var allowStunFallback = false
     private var cameraFacingPref = "back"
     private var qualityPref = "medium"
-    private var remoteDescriptionSet = false
-    private val pendingRemoteIceCandidates = ArrayDeque<IceCandidate>()
+    private var localClientId: String = ""
 
     // Foreground service
     private var streamingService: StreamingForegroundService? = null
@@ -80,6 +80,13 @@ class WebRTCStreamActivity : AppCompatActivity() {
     companion object {
         private const val PERMISSION_REQUEST_CODE = 2000
     }
+
+    private data class PeerSession(
+        val viewerId: String,
+        val peerConnection: PeerConnection,
+        @Volatile var remoteDescriptionSet: Boolean = false,
+        val pendingRemoteIceCandidates: ArrayDeque<IceCandidate> = ArrayDeque(),
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -300,10 +307,23 @@ class WebRTCStreamActivity : AppCompatActivity() {
                 try {
                     val json = JSONObject(message)
                     when (json.getString("type")) {
-                        "joined" -> onJoined()
-                        "peer_joined" -> onPeerJoined()
-                        "answer" -> onAnswer(json.getString("sdp"))
-                        "ice" -> onIceCandidate(json.getJSONObject("candidate"))
+                        "joined" -> onJoined(json.optString("clientId", ""))
+                        "peer_joined" -> onPeerJoined(
+                            json.optString("role", ""),
+                            json.optString("clientId", "")
+                        )
+                        "peer_left" -> onPeerLeft(
+                            json.optString("role", ""),
+                            json.optString("clientId", "")
+                        )
+                        "answer" -> onAnswer(
+                            json.optString("from", ""),
+                            json.getString("sdp")
+                        )
+                        "ice" -> onIceCandidate(
+                            json.optString("from", ""),
+                            json.getJSONObject("candidate")
+                        )
                         "error" -> {
                             val err = json.optString("message", "Unknown error")
                             runOnUiThread {
@@ -319,6 +339,7 @@ class WebRTCStreamActivity : AppCompatActivity() {
 
             override fun onClose(code: Int, reason: String?, remote: Boolean) {
                 Log.d(TAG, "Signaling: closed $reason")
+                closeAllPeerSessions()
                 runOnUiThread {
                     binding.tvStatus.text = "Signaling: disconnected"
                 }
@@ -349,34 +370,62 @@ class WebRTCStreamActivity : AppCompatActivity() {
         }, delayMs)
     }
 
-    private fun onJoined() {
+    private fun onJoined(clientId: String) {
+        localClientId = clientId
         runOnUiThread {
             binding.tvStatus.text = "Joined room, waiting for viewer..."
         }
     }
 
-    private fun onPeerJoined() {
-        // Viewer joined, create offer
-        runOnUiThread {
-            binding.tvStatus.text = "Viewer joined, creating offer..."
+    private fun onPeerJoined(role: String, clientId: String) {
+        if (role != "viewer" || clientId.isBlank()) {
+            return
         }
+
+        runOnUiThread {
+            binding.tvStatus.text = "Viewer connected (${peerSessions.size + 1}), creating offer..."
+        }
+
+        if (peerSessions.containsKey(clientId)) {
+            return
+        }
+
         try {
-            createPeerConnection()
-            createOffer()
+            val session = createPeerSession(clientId)
+            if (session == null) {
+                runOnUiThread {
+                    binding.tvStatus.text = "Failed to prepare session for viewer"
+                }
+                return
+            }
+            createOffer(session.viewerId)
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to start WebRTC session", t)
+            Log.e(TAG, "Failed to start WebRTC session for viewer=$clientId", t)
             runOnUiThread {
                 binding.tvStatus.text = "WebRTC error: ${t.javaClass.simpleName}"
                 Toast.makeText(this, "WebRTC failed: ${t.message}", Toast.LENGTH_LONG).show()
             }
-            // Don't crash; just stop cleanly.
-            stopStream()
+            closeViewerSession(clientId)
         }
     }
 
-    private fun createPeerConnection() {
-        remoteDescriptionSet = false
-        pendingRemoteIceCandidates.clear()
+    private fun onPeerLeft(role: String, clientId: String) {
+        if (role != "viewer" || clientId.isBlank()) {
+            return
+        }
+        closeViewerSession(clientId)
+        runOnUiThread {
+            binding.tvStatus.text = if (peerSessions.isEmpty()) {
+                "Joined room, waiting for viewer..."
+            } else {
+                "Viewer disconnected, active viewers: ${peerSessions.size}"
+            }
+        }
+    }
+
+    private fun createPeerSession(viewerId: String): PeerSession? {
+        peerSessions[viewerId]?.let { return it }
+
         val iceServers = if (allowStunFallback) {
             listOf(
                 PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
@@ -393,13 +442,14 @@ class WebRTCStreamActivity : AppCompatActivity() {
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
         }
 
-        peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
+        val peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate?) {
                 candidate ?: return
-                Log.d(TAG, "onIceCandidate: ${candidate.sdp}")
+                Log.d(TAG, "onIceCandidate(viewer=$viewerId): ${candidate.sdp}")
                 val iceMsg = JSONObject().apply {
                     put("type", "ice")
                     put("room", roomName)
+                    put("to", viewerId)
                     put("candidate", JSONObject().apply {
                         put("sdpMid", candidate.sdpMid)
                         put("sdpMLineIndex", candidate.sdpMLineIndex)
@@ -414,17 +464,22 @@ class WebRTCStreamActivity : AppCompatActivity() {
             }
 
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
-                Log.d(TAG, "onIceConnectionChange: $state")
+                Log.d(TAG, "onIceConnectionChange(viewer=$viewerId): $state")
                 runOnUiThread {
                     when (state) {
                         PeerConnection.IceConnectionState.CONNECTED -> {
-                            binding.tvStatus.text = "Streaming (P2P connected)"
+                            binding.tvStatus.text = "Streaming to ${peerSessions.size} viewer(s)"
                             binding.btnToggle.text = "Stop"
                             streamingService?.updateNotification("Streaming active")
                         }
                         PeerConnection.IceConnectionState.DISCONNECTED,
                         PeerConnection.IceConnectionState.FAILED -> {
-                            binding.tvStatus.text = "Connection lost"
+                            closeViewerSession(viewerId)
+                            binding.tvStatus.text = if (peerSessions.isEmpty()) {
+                                "Connection lost, waiting for viewer..."
+                            } else {
+                                "Viewer connection lost, active viewers: ${peerSessions.size}"
+                            }
                             streamingService?.updateNotification("Connection lost")
                         }
                         else -> {}
@@ -446,30 +501,43 @@ class WebRTCStreamActivity : AppCompatActivity() {
             override fun onAddTrack(receiver: RtpReceiver?, streams: Array<out MediaStream>?) {}
         })
 
-        // Add local tracks
-        peerConnection?.addTrack(localVideoTrack, listOf("stream0"))
-        peerConnection?.addTrack(localAudioTrack, listOf("stream0"))
+        if (peerConnection == null) {
+            return null
+        }
+
+        val videoTrack = localVideoTrack ?: return null
+        val audioTrack = localAudioTrack ?: return null
+
+        // Add local tracks to each viewer-specific peer connection.
+        peerConnection.addTrack(videoTrack, listOf("stream0"))
+        peerConnection.addTrack(audioTrack, listOf("stream0"))
+
+        val session = PeerSession(viewerId = viewerId, peerConnection = peerConnection)
+        peerSessions[viewerId] = session
+        return session
     }
 
-    private fun createOffer() {
+    private fun createOffer(viewerId: String) {
+        val session = peerSessions[viewerId] ?: return
         val constraints = MediaConstraints()
 
-        peerConnection?.createOffer(object : SdpObserver {
+        session.peerConnection.createOffer(object : SdpObserver {
             override fun onCreateSuccess(sdp: SessionDescription?) {
                 sdp ?: return
-                peerConnection?.setLocalDescription(object : SdpObserver {
+                session.peerConnection.setLocalDescription(object : SdpObserver {
                     override fun onSetSuccess() {
-                        Log.d(TAG, "setLocalDescription success")
+                        Log.d(TAG, "setLocalDescription success viewer=$viewerId")
                         val offerMsg = JSONObject().apply {
                             put("type", "offer")
                             put("room", roomName)
+                            put("to", viewerId)
                             put("sdp", sdp.description)
                         }
                         signalingClient?.send(offerMsg.toString())
                     }
 
                     override fun onSetFailure(error: String?) {
-                        Log.e(TAG, "setLocalDescription failed: $error")
+                        Log.e(TAG, "setLocalDescription failed viewer=$viewerId: $error")
                     }
 
                     override fun onCreateSuccess(p0: SessionDescription?) {}
@@ -479,25 +547,33 @@ class WebRTCStreamActivity : AppCompatActivity() {
 
             override fun onSetSuccess() {}
             override fun onCreateFailure(error: String?) {
-                Log.e(TAG, "createOffer failed: $error")
+                Log.e(TAG, "createOffer failed viewer=$viewerId: $error")
             }
 
             override fun onSetFailure(error: String?) {}
         }, constraints)
     }
 
-    private fun onAnswer(sdp: String) {
-        Log.d(TAG, "Received answer")
+    private fun onAnswer(fromClientId: String, sdp: String) {
+        if (fromClientId.isBlank()) {
+            Log.w(TAG, "Received answer without from client id")
+            return
+        }
+        val session = peerSessions[fromClientId] ?: run {
+            Log.w(TAG, "No session for answer from viewer=$fromClientId")
+            return
+        }
+        Log.d(TAG, "Received answer from viewer=$fromClientId")
         val answerSdp = SessionDescription(SessionDescription.Type.ANSWER, sdp)
-        peerConnection?.setRemoteDescription(object : SdpObserver {
+        session.peerConnection.setRemoteDescription(object : SdpObserver {
             override fun onSetSuccess() {
-                Log.d(TAG, "setRemoteDescription (answer) success")
-                remoteDescriptionSet = true
-                flushPendingRemoteIceCandidates()
+                Log.d(TAG, "setRemoteDescription (answer) success viewer=$fromClientId")
+                session.remoteDescriptionSet = true
+                flushPendingRemoteIceCandidates(session)
             }
 
             override fun onSetFailure(error: String?) {
-                Log.e(TAG, "setRemoteDescription (answer) failed: $error")
+                Log.e(TAG, "setRemoteDescription (answer) failed viewer=$fromClientId: $error")
             }
 
             override fun onCreateSuccess(p0: SessionDescription?) {}
@@ -505,28 +581,51 @@ class WebRTCStreamActivity : AppCompatActivity() {
         }, answerSdp)
     }
 
-    private fun onIceCandidate(candidate: JSONObject) {
-        if (peerConnection == null) return
+    private fun onIceCandidate(fromClientId: String, candidate: JSONObject) {
+        if (fromClientId.isBlank()) {
+            Log.w(TAG, "Received ICE without from client id")
+            return
+        }
+        val session = peerSessions[fromClientId] ?: run {
+            Log.w(TAG, "No session for ICE from viewer=$fromClientId")
+            return
+        }
         val iceCandidate = IceCandidate(
             candidate.getString("sdpMid"),
             candidate.getInt("sdpMLineIndex"),
             candidate.getString("candidate")
         )
-        if (!remoteDescriptionSet) {
-            pendingRemoteIceCandidates.add(iceCandidate)
-            Log.d(TAG, "Queued remote ICE candidate")
+        if (!session.remoteDescriptionSet) {
+            session.pendingRemoteIceCandidates.add(iceCandidate)
+            Log.d(TAG, "Queued remote ICE candidate viewer=$fromClientId")
             return
         }
-        peerConnection?.addIceCandidate(iceCandidate)
-        Log.d(TAG, "Added remote ICE candidate")
+        session.peerConnection.addIceCandidate(iceCandidate)
+        Log.d(TAG, "Added remote ICE candidate viewer=$fromClientId")
     }
 
-    private fun flushPendingRemoteIceCandidates() {
-        if (!remoteDescriptionSet || peerConnection == null) return
-        while (pendingRemoteIceCandidates.isNotEmpty()) {
-            val candidate = pendingRemoteIceCandidates.removeFirst()
-            peerConnection?.addIceCandidate(candidate)
-            Log.d(TAG, "Added queued remote ICE candidate")
+    private fun flushPendingRemoteIceCandidates(session: PeerSession) {
+        if (!session.remoteDescriptionSet) return
+        while (session.pendingRemoteIceCandidates.isNotEmpty()) {
+            val candidate = session.pendingRemoteIceCandidates.removeFirst()
+            session.peerConnection.addIceCandidate(candidate)
+            Log.d(TAG, "Added queued remote ICE candidate viewer=${session.viewerId}")
+        }
+    }
+
+    private fun closeViewerSession(viewerId: String) {
+        val session = peerSessions.remove(viewerId) ?: return
+        try {
+            session.peerConnection.close()
+        } catch (_: Exception) {
+        }
+        session.pendingRemoteIceCandidates.clear()
+    }
+
+    private fun closeAllPeerSessions() {
+        val viewerIds = peerSessions.keys.toList()
+        viewerIds.forEach { viewerId ->
+            closeViewerSession(viewerId)
         }
     }
 
@@ -544,13 +643,8 @@ class WebRTCStreamActivity : AppCompatActivity() {
         }
         signalingClient = null
 
-        try {
-            peerConnection?.close()
-        } catch (_: Exception) {
-        }
-        peerConnection = null
-        remoteDescriptionSet = false
-        pendingRemoteIceCandidates.clear()
+        closeAllPeerSessions()
+        localClientId = ""
 
         try {
             videoCapturer?.stopCapture()

@@ -12,76 +12,131 @@
     <script src="bundle.js"></script>
 
     <style>
-        #container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+        .home-card {
+            padding: 28px 24px;
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .action-grid md-filled-button,
+        .action-grid md-outlined-button {
             width: 100%;
         }
 
-        #controls {
+        .section-title {
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: -0.01em;
+        }
+
+        .section-subtitle {
+            margin: 6px 0 0;
+            color: var(--apple-text-subtle);
+            font-size: 14px;
+        }
+
+        .section + .section {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--apple-border);
+        }
+
+        #auth-container {
             display: flex;
-            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        #auth-container md-filled-button,
+        #auth-container md-outlined-button {
+            width: calc(50% - 6px);
+            min-width: 130px;
+        }
+
+        #logout_button {
             width: 100%;
-            position: absolute;
-            top: calc(50% - 48px)
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 760px) {
+            .action-grid {
+                grid-template-columns: 1fr;
+            }
+
+            #auth-container md-filled-button,
+            #auth-container md-outlined-button {
+                width: 100%;
+            }
         }
     </style>
 </head>
 
 <body>
-<h1 style="text-align: center; margin-top: 32px;">IP Camera</h1>
+<main class="app-shell">
+    <header class="hero">
+        <h1 class="page-title">IP Camera</h1>
+        <p class="page-subtitle">Real-time WebRTC monitoring with clear, mobile-first controls.</p>
+    </header>
 
-<div id="controls">
-    <div id="container">
-        <md-filled-button
-                style="margin-top: 16px; width: 80%;"
-                href="/stream.html">Connect
-        </md-filled-button>
-
-        <md-filled-button
-                style="margin-top: 16px ;width: 80%;"
-                href="gallery.html">Gallery
-        </md-filled-button>
-
-        <md-filled-button
-                style="margin-top: 16px ;width: 80%;"
-                href="settings.html">Settings
-        </md-filled-button>
-
-        <div id="auth-container">
-            <md-filled-button
-                    id="login_button"
-                    style="margin-top: 16px;"
-                    href="login.html">Login
-            </md-filled-button>
-
-            <md-filled-button
-                    id="register_button"
-                    style="margin-top: 16px;"
-                    href="register.html">Register
-            </md-filled-button>
-
-            <md-filled-button
-                    id="logout_button"
-                    style="margin-top: 16px;"
-                    >Logout
-            </md-filled-button>
+    <section class="app-card home-card">
+        <div class="section">
+            <h2 class="section-title">Live View</h2>
+            <p class="section-subtitle">Use WebRTC viewer for low-latency video + audio from camera.</p>
+            <div class="action-grid">
+                <md-filled-button href="webrtc_viewer.html">Open WebRTC Viewer</md-filled-button>
+                <md-outlined-button href="settings.html">Open Settings</md-outlined-button>
+            </div>
         </div>
 
-    </div>
-</div>
+        <div class="section">
+            <h2 class="section-title">Media</h2>
+            <p class="section-subtitle">Capture snapshots while streaming and review them in gallery.</p>
+            <div class="action-grid">
+                <md-filled-button href="gallery.html">Open Gallery</md-filled-button>
+                <md-outlined-button href="stream.html">Legacy Stream</md-outlined-button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">Account</h2>
+            <p class="section-subtitle">Sign in for screenshot and gallery features.</p>
+            <div id="auth-container">
+                <md-filled-button id="login_button" href="login.html">Login</md-filled-button>
+                <md-outlined-button id="register_button" href="register.html">Register</md-outlined-button>
+                <md-filled-button id="logout_button">Logout</md-filled-button>
+            </div>
+        </div>
+    </section>
+</main>
 <script src="common.js"></script>
 <script>
-    const logoutButton = document.getElementById('logout_button')
+    const logoutButton = document.getElementById('logout_button');
+    const loginButton = document.getElementById('login_button');
+    const registerButton = document.getElementById('register_button');
+
     if (getAuthorization() === '') {
         logoutButton.style.display = 'none';
+    } else {
+        loginButton.style.display = 'none';
+        registerButton.style.display = 'none';
     }
 
-    logoutButton.addEventListener('click', (ev) => {
-        clearAuthorization()
+    logoutButton.addEventListener('click', () => {
+        clearAuthorization();
         logoutButton.style.display = 'none';
-    })
+        loginButton.style.display = '';
+        registerButton.style.display = '';
+    });
 
 </script>
 </body>
