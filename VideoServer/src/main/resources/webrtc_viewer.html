@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baby Cam Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background: #ffffff;
+            color: #1d1d1f;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            text-align: center;
+            color: #1d1d1f;
+        }
+
+        #status {
+            text-align: center;
+            padding: 12px 24px;
+            background: #f5f5f7;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: #6e6e73;
+        }
+
+        #status.connected {
+            background: #d1f4e0;
+            color: #0a7340;
+        }
+
+        #status.error {
+            background: #ffeaea;
+            color: #c41e3a;
+        }
+
+        #remote-video {
+            width: 100%;
+            max-width: 100%;
+            background: #000;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .controls {
+            margin-top: 24px;
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        button {
+            padding: 12px 32px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #0051d5;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #d1d1d6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .settings {
+            background: #f5f5f7;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .settings label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #6e6e73;
+        }
+
+        .settings input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            background: white;
+        }
+
+        .settings input:focus {
+            outline: none;
+            border-color: #007aff;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Baby Cam</h1>
+        
+        <div id="settings-panel" class="settings">
+            <label for="server-input">Signaling Server (IP:Port)</label>
+            <input type="text" id="server-input" placeholder="192.168.0.101:8081" value="192.168.0.101:8081">
+            
+            <label for="token-input">Signaling Token</label>
+            <input type="password" id="token-input" placeholder="Enter your token">
+            
+            <button id="connect-btn">Connect</button>
+        </div>
+
+        <div id="status">Not connected</div>
+
+        <video id="remote-video" autoplay playsinline></video>
+
+        <div class="controls">
+            <button id="disconnect-btn" class="hidden">Disconnect</button>
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const remoteVideo = document.getElementById('remote-video');
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const settingsPanel = document.getElementById('settings-panel');
+        const serverInput = document.getElementById('server-input');
+        const tokenInput = document.getElementById('token-input');
+
+        let signalingWs = null;
+        let peerConnection = null;
+        const roomName = 'baby';
+        let remoteDescriptionSet = false;
+        let pendingRemoteIceCandidates = [];
+
+        function setStatus(message, type = 'normal') {
+            statusEl.textContent = message;
+            statusEl.className = type;
+        }
+
+        function setError(message) {
+            setStatus(message, 'error');
+            console.error(message);
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            const server = serverInput.value.trim();
+            const token = tokenInput.value.trim();
+
+            if (!server || !token) {
+                setError('Please enter server address and token');
+                return;
+            }
+
+            // Save to localStorage
+            localStorage.setItem('signaling_server', server);
+            localStorage.setItem('signaling_token', token);
+
+            await connect(server, token);
+        });
+
+        disconnectBtn.addEventListener('click', () => {
+            disconnect();
+        });
+
+        async function connect(server, token) {
+            setStatus('Connecting to signaling...');
+            connectBtn.disabled = true;
+
+            try {
+                signalingWs = new WebSocket(`ws://${server}`);
+
+                signalingWs.onopen = () => {
+                    console.log('Signaling: connected');
+                    setStatus('Signaling connected, joining room...');
+
+                    // Join as viewer
+                    signalingWs.send(JSON.stringify({
+                        type: 'join',
+                        room: roomName,
+                        role: 'viewer',
+                        token: token
+                    }));
+                };
+
+                signalingWs.onmessage = async (event) => {
+                    const msg = JSON.parse(event.data);
+                    console.log('Signaling:', msg);
+
+                    switch (msg.type) {
+                        case 'joined':
+                            setStatus('Joined room, waiting for camera...');
+                            settingsPanel.classList.add('hidden');
+                            disconnectBtn.classList.remove('hidden');
+                            break;
+
+                        case 'peer_joined':
+                            if (msg.role === 'camera') {
+                                setStatus('Camera connected, waiting for stream...');
+                                createPeerConnection();
+                            }
+                            break;
+
+                        case 'offer':
+                            await handleOffer(msg.sdp);
+                            break;
+
+                        case 'ice':
+                            await handleIceCandidate(msg.candidate);
+                            break;
+
+                        case 'peer_left':
+                            setStatus('Camera disconnected');
+                            break;
+
+                        case 'error':
+                            setError(`Server error: ${msg.message}`);
+                            disconnect();
+                            break;
+                    }
+                };
+
+                signalingWs.onerror = (error) => {
+                    console.error('Signaling error:', error);
+                    setError('Signaling connection error');
+                    disconnect();
+                };
+
+                signalingWs.onclose = () => {
+                    console.log('Signaling: closed');
+                    if (statusEl.className !== 'error') {
+                        setStatus('Signaling disconnected');
+                    }
+                };
+
+            } catch (error) {
+                setError(`Failed to connect: ${error.message}`);
+                connectBtn.disabled = false;
+            }
+        }
+
+        function createPeerConnection() {
+            remoteDescriptionSet = false;
+            pendingRemoteIceCandidates = [];
+            const config = {
+                // Browser-side fallback STUN to avoid host-only ICE dead-ends.
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            };
+
+            peerConnection = new RTCPeerConnection(config);
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && signalingWs && signalingWs.readyState === WebSocket.OPEN) {
+                    signalingWs.send(JSON.stringify({
+                        type: 'ice',
+                        room: roomName,
+                        candidate: {
+                            sdpMid: event.candidate.sdpMid,
+                            sdpMLineIndex: event.candidate.sdpMLineIndex,
+                            candidate: event.candidate.candidate
+                        }
+                    }));
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                console.log('Received remote track:', event.track.kind);
+                if (event.streams && event.streams[0]) {
+                    remoteVideo.srcObject = event.streams[0];
+                    setStatus('Streaming', 'connected');
+                }
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('ICE connection state:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'disconnected' || 
+                    peerConnection.iceConnectionState === 'failed') {
+                    setError('Connection lost');
+                }
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                console.log('Connection state:', peerConnection.connectionState);
+            };
+        }
+
+        async function handleOffer(sdp) {
+            if (!peerConnection) {
+                createPeerConnection();
+            }
+
+            try {
+                await peerConnection.setRemoteDescription({ type: 'offer', sdp });
+                remoteDescriptionSet = true;
+                await flushPendingRemoteIceCandidates();
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                signalingWs.send(JSON.stringify({
+                    type: 'answer',
+                    room: roomName,
+                    sdp: answer.sdp
+                }));
+
+                console.log('Sent answer');
+            } catch (error) {
+                setError(`Failed to handle offer: ${error.message}`);
+            }
+        }
+
+        async function handleIceCandidate(candidate) {
+            if (!peerConnection || !remoteDescriptionSet) {
+                pendingRemoteIceCandidates.push(candidate);
+                return;
+            }
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate({
+                    sdpMid: candidate.sdpMid,
+                    sdpMLineIndex: candidate.sdpMLineIndex,
+                    candidate: candidate.candidate
+                }));
+                console.log('Added remote ICE candidate');
+            } catch (error) {
+                console.error('Failed to add ICE candidate:', error);
+            }
+        }
+
+        async function flushPendingRemoteIceCandidates() {
+            if (!peerConnection || !remoteDescriptionSet || pendingRemoteIceCandidates.length === 0) {
+                return;
+            }
+            const queue = pendingRemoteIceCandidates.slice();
+            pendingRemoteIceCandidates = [];
+            for (const candidate of queue) {
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate({
+                        sdpMid: candidate.sdpMid,
+                        sdpMLineIndex: candidate.sdpMLineIndex,
+                        candidate: candidate.candidate
+                    }));
+                    console.log('Added queued remote ICE candidate');
+                } catch (error) {
+                    console.error('Failed to add queued ICE candidate:', error);
+                }
+            }
+        }
+
+        function disconnect() {
+            if (signalingWs) {
+                signalingWs.close();
+                signalingWs = null;
+            }
+
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            remoteDescriptionSet = false;
+            pendingRemoteIceCandidates = [];
+            remoteVideo.srcObject = null;
+            setStatus('Disconnected');
+            settingsPanel.classList.remove('hidden');
+            disconnectBtn.classList.add('hidden');
+            connectBtn.disabled = false;
+        }
+
+        // Load saved settings
+        window.addEventListener('load', () => {
+            const savedServer = localStorage.getItem('signaling_server');
+            const savedToken = localStorage.getItem('signaling_token');
+
+            if (savedServer) serverInput.value = savedServer;
+            if (savedToken) tokenInput.value = savedToken;
+        });
+    </script>
+</body>
+</html>
