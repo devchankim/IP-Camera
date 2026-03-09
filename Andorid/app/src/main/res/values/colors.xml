@@ -2,4 +2,22 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- iOS 26 System Colors -->
+    <color name="ios_blue">#007AFF</color>
+    <color name="ios_blue_dark">#0051D5</color>
+    <color name="ios_green">#30D158</color>
+    <color name="ios_red">#FF3B30</color>
+    <color name="ios_text">#1D1D1F</color>
+    <color name="ios_text_secondary">#993C3C43</color>
+    <color name="ios_separator">#1E3C3C43</color>
+
+    <!-- Glass surfaces -->
+    <color name="glass_white">#85FFFFFF</color>
+    <color name="glass_white_border">#AAFFFFFF</color>
+    <color name="glass_dark_overlay">#8C000000</color>
+    <color name="glass_dark_btn">#8C141414</color>
+
+    <!-- Background -->
+    <color name="bg_base">#EEF2FF</color>
 </resources>

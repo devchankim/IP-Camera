@@ -1,201 +1,233 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+    android:background="@drawable/bg_screen"
+    android:fillViewport="true">
 
-    <TextView
-        android:id="@+id/tv_settings"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Settings"
-        android:textSize="28sp"
-        android:textColor="#1D1D1F"
-        android:fontFamily="sans-serif-medium"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        android:layout_marginTop="60dp"
-        />
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/text_input_ip"
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/tv_settings"
-        app:helperText="Format: 192.168.0.101:8081"
-        app:helperTextTextColor="#86868B"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="40dp"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-        app:boxCornerRadiusTopStart="8dp"
-        app:boxCornerRadiusTopEnd="8dp"
-        app:boxCornerRadiusBottomStart="8dp"
-        app:boxCornerRadiusBottomEnd="8dp"
-        >
+        android:paddingBottom="40dp">
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/edit_text_ip"
-            android:layout_width="match_parent"
+        <!-- Title -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tv_settings"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:hint="Signaling Server IP:Port"
-            android:inputType="textNoSuggestions"
-            android:textSize="16sp"
-            />
+            android:text="Settings"
+            android:textSize="34sp"
+            android:textColor="@color/ios_text"
+            android:fontFamily="sans-serif-black"
+            android:letterSpacing="-0.03"
+            android:layout_marginTop="56dp"
+            android:layout_marginStart="24dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/text_input_token"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/text_input_ip"
-        app:helperText="Shared secret (set SIGNALING_TOKEN on server)"
-        app:helperTextTextColor="#86868B"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="20dp"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-        app:boxCornerRadiusTopStart="8dp"
-        app:boxCornerRadiusTopEnd="8dp"
-        app:boxCornerRadiusBottomStart="8dp"
-        app:boxCornerRadiusBottomEnd="8dp"
-        app:endIconMode="password_toggle"
-        >
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/edit_text_token"
-            android:layout_width="match_parent"
+        <!-- Glass settings card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_settings"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:hint="Signaling Token"
-            android:inputType="textPassword"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginTop="20dp"
+            app:cardBackgroundColor="@color/glass_white"
+            app:cardCornerRadius="@dimen/card_radius"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/glass_white_border"
+            app:strokeWidth="1dp"
+            app:layout_constraintTop_toBottomOf="@id/tv_settings"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <!-- Signaling Server -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/text_input_ip"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.IpCamera.TextInput"
+                    app:helperText="Format: 100.x.x.x:8081"
+                    app:helperTextTextColor="@color/ios_text_secondary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_text_ip"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Signaling Server IP:Port"
+                        android:inputType="textNoSuggestions"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Token -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/text_input_token"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    style="@style/Widget.IpCamera.TextInput"
+                    app:helperText="Shared secret (SIGNALING_TOKEN on server)"
+                    app:helperTextTextColor="@color/ios_text_secondary"
+                    app:endIconMode="password_toggle">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_text_token"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Access Token"
+                        android:inputType="textPassword"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/ios_separator"
+                    android:layout_marginTop="20dp"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Camera label -->
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tv_camera"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CAMERA"
+                    android:textColor="@color/ios_text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.06"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Camera toggle -->
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/toggle_camera_facing"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true"
+                    app:selectionRequired="true">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_camera_back"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:text="Rear"
+                        android:textAllCaps="false"
+                        app:cornerRadius="22dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_camera_front"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:text="Front"
+                        android:textAllCaps="false"
+                        app:cornerRadius="22dp" />
+
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                <!-- Quality label -->
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tv_quality"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="QUALITY"
+                    android:textColor="@color/ios_text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.06"
+                    android:layout_marginTop="18dp"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Quality toggle -->
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/toggle_quality"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true"
+                    app:selectionRequired="true">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_quality_low"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:text="Low"
+                        android:textAllCaps="false"
+                        app:cornerRadius="22dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_quality_medium"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:text="Standard"
+                        android:textAllCaps="false"
+                        app:cornerRadius="22dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_quality_high"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:text="High"
+                        android:textAllCaps="false"
+                        app:cornerRadius="22dp" />
+
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/ios_separator"
+                    android:layout_marginTop="18dp"
+                    android:layout_marginBottom="4dp" />
+
+                <!-- STUN switch -->
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_stun"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="Allow STUN fallback"
+                    android:textColor="@color/ios_text"
+                    android:textSize="15sp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Save button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_save"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginTop="20dp"
+            android:text="Save"
             android:textSize="16sp"
-            />
+            android:textColor="@color/white"
+            android:backgroundTint="@color/ios_blue"
+            app:cornerRadius="@dimen/btn_radius"
+            app:layout_constraintTop_toBottomOf="@id/card_settings"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <TextView
-        android:id="@+id/tv_camera"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Camera"
-        android:textColor="#1D1D1F"
-        android:textSize="14sp"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="24dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/text_input_token"
-        />
-
-    <com.google.android.material.button.MaterialButtonToggleGroup
-        android:id="@+id/toggle_camera_facing"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="10dp"
-        app:singleSelection="true"
-        app:selectionRequired="true"
-        app:layout_constraintTop_toBottomOf="@id/tv_camera"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_camera_back"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="Rear"
-            />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_camera_front"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="Front"
-            />
-    </com.google.android.material.button.MaterialButtonToggleGroup>
-
-    <TextView
-        android:id="@+id/tv_quality"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Quality"
-        android:textColor="#1D1D1F"
-        android:textSize="14sp"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="18dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/toggle_camera_facing"
-        />
-
-    <com.google.android.material.button.MaterialButtonToggleGroup
-        android:id="@+id/toggle_quality"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="10dp"
-        app:singleSelection="true"
-        app:selectionRequired="true"
-        app:layout_constraintTop_toBottomOf="@id/tv_quality"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_quality_low"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="Low"
-            />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_quality_medium"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="Standard"
-            />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_quality_high"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="High"
-            />
-    </com.google.android.material.button.MaterialButtonToggleGroup>
-
-    <com.google.android.material.materialswitch.MaterialSwitch
-        android:id="@+id/switch_stun"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="18dp"
-        android:text="Allow STUN fallback (uses public STUN)"
-        android:textColor="#1D1D1F"
-        app:layout_constraintTop_toBottomOf="@id/toggle_quality"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_save"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginBottom="40dp"
-        android:text="Save"
-        android:textSize="16sp"
-        app:cornerRadius="12dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        />
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>
