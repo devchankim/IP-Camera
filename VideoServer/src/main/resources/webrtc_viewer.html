@@ -46,13 +46,52 @@
         .status-row {
             display: flex;
             justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
-        .settings-card {
+        /* #11 latency / quality badge */
+        .stats-badge {
+            display: none;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 12px;
+            border-radius: var(--r-pill);
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(120,120,128,0.14);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.50);
+            color: var(--ios-text-2);
+        }
+        .stats-badge.visible { display: inline-flex; }
+        .stats-badge .stat-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--ios-green);
+            flex-shrink: 0;
+        }
+        .stats-badge.quality-poor .stat-dot { background: var(--ios-red); }
+        .stats-badge.quality-fair .stat-dot { background: #ff9500; }
+
+        /* #3 server-offline banner */
+        .server-banner {
+            display: none;
             width: 100%;
-            padding: 24px;
+            padding: 10px 18px;
+            border-radius: var(--r-md);
+            background: rgba(255,59,48,0.14);
+            border: 1px solid rgba(255,59,48,0.35);
+            color: #b42328;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
         }
+        .server-banner.visible { display: block; }
 
+        .settings-card { width: 100%; padding: 24px; }
         .field-group { display: flex; flex-direction: column; gap: 14px; }
         .field-wrap  { display: flex; flex-direction: column; gap: 7px; }
 
@@ -64,13 +103,18 @@
             text-transform: uppercase;
         }
 
-        .actions-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            flex-wrap: wrap;
+        /* Advanced section */
+        .advanced-toggle {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ios-blue);
+            cursor: pointer;
+            user-select: none;
         }
+        .advanced-section { display: none; }
+        .advanced-section.open { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
 
+        .actions-row { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
         .actions-row .btn { flex: 1; min-width: 120px; }
 
         /* Video */
@@ -80,9 +124,9 @@
             background: #000;
             border-radius: var(--r-xl);
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.30),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.30),
+                        inset 0 1px 0 rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.15);
         }
 
         #remote-video {
@@ -93,7 +137,6 @@
             border-radius: var(--r-xl);
         }
 
-        /* Floating overlay controls */
         .video-overlay {
             position: absolute;
             bottom: 0; left: 0; right: 0;
@@ -107,10 +150,10 @@
         }
 
         .overlay-btn {
-            background: rgba(20, 20, 20, 0.55);
+            background: rgba(20,20,20,0.55);
             backdrop-filter: blur(16px) saturate(160%);
             -webkit-backdrop-filter: blur(16px) saturate(160%);
-            border: 1px solid rgba(255, 255, 255, 0.22);
+            border: 1px solid rgba(255,255,255,0.22);
             border-radius: var(--r-pill);
             color: #fff;
             font-size: 14px;
@@ -121,15 +164,48 @@
             transition: transform 0.14s ease, background 0.14s ease;
             -webkit-appearance: none;
         }
-
         .overlay-btn:active { transform: scale(0.95); }
-        .overlay-btn:hover  { background: rgba(40, 40, 40, 0.70); }
+        .overlay-btn:hover  { background: rgba(40,40,40,0.70); }
 
-        .hint {
-            font-size: 13px;
-            color: var(--ios-text-3);
-            text-align: center;
-            letter-spacing: -0.01em;
+        .hint { font-size: 13px; color: var(--ios-text-3); text-align: center; }
+
+        /* ── #5 Cry detection toast ────────────────────────────────────── */
+        #cry-toast {
+            position: fixed;
+            bottom: max(28px, env(safe-area-inset-bottom, 28px));
+            right:  max(20px, env(safe-area-inset-right,  20px));
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: var(--r-lg);
+            background: rgba(255,59,48,0.88);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255,120,110,0.6);
+            box-shadow: 0 8px 30px rgba(255,59,48,0.35);
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(16px) scale(0.95);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            pointer-events: none;
+        }
+        #cry-toast.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+        #cry-toast-close {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.85);
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            padding: 0 2px;
         }
 
         @media (max-width: 680px) {
@@ -147,8 +223,16 @@
             <p class="viewer-subtitle">WebRTC · Low-latency · Secure</p>
         </header>
 
+        <!-- #3 server offline banner -->
+        <div id="server-banner" class="server-banner">⚠ Server unreachable — check VPN / Mac Mini</div>
+
         <div class="status-row">
             <div id="status" class="status-chip">Not connected</div>
+            <!-- #11 latency / quality badge -->
+            <div id="stats-badge" class="stats-badge">
+                <span class="stat-dot"></span>
+                <span id="stats-text">--</span>
+            </div>
         </div>
 
         <div id="settings-panel" class="app-card settings-card">
@@ -163,6 +247,32 @@
                     <label class="field-label" for="token-input">Access Token</label>
                     <input class="glass-input" type="password" id="token-input"
                            placeholder="Enter token">
+                </div>
+                <!-- #15 Room name -->
+                <div class="field-wrap">
+                    <label class="field-label" for="room-input">Room Name</label>
+                    <input class="glass-input" type="text" id="room-input"
+                           placeholder="baby" value="baby" autocorrect="off"
+                           autocapitalize="none" spellcheck="false">
+                </div>
+                <!-- #9 Advanced TURN -->
+                <div class="advanced-toggle" id="advanced-toggle">▸ Advanced (TURN server)</div>
+                <div class="advanced-section" id="advanced-section">
+                    <div class="field-wrap">
+                        <label class="field-label" for="turn-url-input">TURN URL</label>
+                        <input class="glass-input" type="text" id="turn-url-input"
+                               placeholder="turn:my-turn.example.com:3478"
+                               autocorrect="off" autocapitalize="none" spellcheck="false">
+                    </div>
+                    <div class="field-wrap">
+                        <label class="field-label" for="turn-user-input">TURN Username</label>
+                        <input class="glass-input" type="text" id="turn-user-input"
+                               autocorrect="off" autocapitalize="none" spellcheck="false">
+                    </div>
+                    <div class="field-wrap">
+                        <label class="field-label" for="turn-cred-input">TURN Credential</label>
+                        <input class="glass-input" type="password" id="turn-cred-input">
+                    </div>
                 </div>
             </div>
             <div class="actions-row">
@@ -184,107 +294,202 @@
 
     </main>
 
+    <!-- #5 Cry detection toast (bottom-right) -->
+    <div id="cry-toast" role="alert" aria-live="assertive">
+        🍼 Crying detected
+        <button id="cry-toast-close" aria-label="Dismiss">✕</button>
+    </div>
+
     <script>
-        const roomName = "baby";
-        const statusEl = document.getElementById("status");
-        const remoteVideo = document.getElementById("remote-video");
-        const connectBtn = document.getElementById("connect-btn");
+    (() => {
+        /* ── DOM refs ───────────────────────────────────────────────────── */
+        const statusEl      = document.getElementById("status");
+        const remoteVideo   = document.getElementById("remote-video");
+        const connectBtn    = document.getElementById("connect-btn");
         const disconnectBtn = document.getElementById("disconnect-btn");
         const retryAudioBtn = document.getElementById("retry-audio-btn");
         const settingsPanel = document.getElementById("settings-panel");
-        const videoSection = document.getElementById("video-section");
-        const hintText = document.getElementById("hint-text");
-        const serverInput = document.getElementById("server-input");
-        const tokenInput = document.getElementById("token-input");
+        const videoSection  = document.getElementById("video-section");
+        const hintText      = document.getElementById("hint-text");
+        const serverInput   = document.getElementById("server-input");
+        const tokenInput    = document.getElementById("token-input");
+        const roomInput     = document.getElementById("room-input");
+        const turnUrlInput  = document.getElementById("turn-url-input");
+        const turnUserInput = document.getElementById("turn-user-input");
+        const turnCredInput = document.getElementById("turn-cred-input");
+        const serverBanner  = document.getElementById("server-banner");
+        const statsBadge    = document.getElementById("stats-badge");
+        const statsText     = document.getElementById("stats-text");
+        const cryToast      = document.getElementById("cry-toast");
+        const cryClose      = document.getElementById("cry-toast-close");
 
-        let signalingWs = null;
-        let peerConnection = null;
-        let ownClientId = "";
-        let cameraClientId = "";
-        let remoteDescriptionSet = false;
+        /* ── Advanced section toggle ────────────────────────────────────── */
+        document.getElementById("advanced-toggle").addEventListener("click", () => {
+            const sec = document.getElementById("advanced-section");
+            const tog = document.getElementById("advanced-toggle");
+            sec.classList.toggle("open");
+            tog.textContent = sec.classList.contains("open")
+                ? "▾ Advanced (TURN server)"
+                : "▸ Advanced (TURN server)";
+        });
+
+        /* ── State ──────────────────────────────────────────────────────── */
+        let signalingWs              = null;
+        let peerConnection           = null;
+        let roomName                 = "baby";
+        let ownClientId              = "";
+        let cameraClientId           = "";
+        let remoteDescriptionSet     = false;
         let pendingRemoteIceCandidates = [];
-        let userInitiatedDisconnect = false;
+        let userInitiatedDisconnect  = false;
+        let statsIntervalId          = null;
+        let wakeLock                 = null;
+        let healthIntervalId         = null;
 
-        function setStatus(message, type = "normal") {
-            statusEl.textContent = message;
+        /* ── #3 Health polling ──────────────────────────────────────────── */
+        function startHealthPolling(serverHost) {
+            stopHealthPolling();
+            const host = serverHost.split(':')[0];
+            const healthUrl = `http://${host}:8080/health`;
+            healthIntervalId = setInterval(async () => {
+                if (signalingWs && signalingWs.readyState === WebSocket.OPEN) return;
+                try {
+                    const r = await fetch(healthUrl, { signal: AbortSignal.timeout(3000) });
+                    serverBanner.classList.toggle("visible", !r.ok);
+                } catch {
+                    serverBanner.classList.add("visible");
+                }
+            }, 5000);
+        }
+        function stopHealthPolling() {
+            if (healthIntervalId) { clearInterval(healthIntervalId); healthIntervalId = null; }
+            serverBanner.classList.remove("visible");
+        }
+
+        /* ── Status helpers ─────────────────────────────────────────────── */
+        function setStatus(msg, type = "normal") {
+            statusEl.textContent = msg;
             statusEl.className = `status-chip${type === "normal" ? "" : ` ${type}`}`;
         }
-
-        function setError(message) {
-            setStatus(message, "error");
-            console.error(message);
-            retryAudioBtn.style.display = "none";
-        }
-
+        function setError(msg) { setStatus(msg, "error"); console.error(msg); retryAudioBtn.style.display = "none"; }
         function showVideo(show) {
             videoSection.style.display = show ? "" : "none";
-            hintText.style.display = show ? "" : "none";
+            hintText.style.display     = show ? "" : "none";
         }
 
+        /* ── #7 WakeLock ────────────────────────────────────────────────── */
+        async function acquireWakeLock() {
+            if (!('wakeLock' in navigator)) return;
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => { wakeLock = null; });
+            } catch (e) { console.warn('WakeLock:', e.message); }
+        }
+        function releaseWakeLock() { if (wakeLock) { wakeLock.release(); wakeLock = null; } }
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && peerConnection) await acquireWakeLock();
+        });
+
+        /* ── #5 Cry toast ───────────────────────────────────────────────── */
+        let cryTimer = null;
+        function showCryToast() {
+            clearTimeout(cryTimer);
+            cryToast.classList.add("visible");
+            cryTimer = setTimeout(hideCryToast, 30_000);
+        }
+        function hideCryToast() { cryToast.classList.remove("visible"); clearTimeout(cryTimer); }
+        cryClose.addEventListener("click", hideCryToast);
+
+        /* ── #11 Stats polling ──────────────────────────────────────────── */
+        function startStats() {
+            stopStats();
+            statsIntervalId = setInterval(async () => {
+                if (!peerConnection) return;
+                const stats = await peerConnection.getStats();
+                let rttMs = null, lossRate = 0;
+                stats.forEach(s => {
+                    if (s.type === 'candidate-pair' && s.state === 'succeeded' && s.currentRoundTripTime != null)
+                        rttMs = Math.round(s.currentRoundTripTime * 1000);
+                    if (s.type === 'inbound-rtp' && s.kind === 'video') {
+                        const lost = s.packetsLost || 0;
+                        const recv = s.packetsReceived || 1;
+                        lossRate = lost / (lost + recv);
+                    }
+                });
+                const quality = lossRate > 0.10 ? 'poor' : lossRate > 0.04 ? 'fair' : 'good';
+                statsText.textContent = `${rttMs != null ? rttMs + ' ms' : '--'} · ${quality}`;
+                statsBadge.className  = `stats-badge visible quality-${quality}`;
+            }, 4000);
+        }
+        function stopStats() {
+            if (statsIntervalId) { clearInterval(statsIntervalId); statsIntervalId = null; }
+            statsBadge.className = "stats-badge";
+        }
+
+        /* ── PeerConnection helpers ─────────────────────────────────────── */
         function closePeerConnection() {
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
+            if (peerConnection) { peerConnection.close(); peerConnection = null; }
             remoteDescriptionSet = false;
             pendingRemoteIceCandidates = [];
             remoteVideo.srcObject = null;
             retryAudioBtn.style.display = "none";
+            stopStats();
+            releaseWakeLock();
         }
 
         function disconnect(userInitiated) {
             userInitiatedDisconnect = userInitiated;
-            if (signalingWs) {
-                signalingWs.close();
-                signalingWs = null;
-            }
+            if (signalingWs) { signalingWs.close(); signalingWs = null; }
             closePeerConnection();
-            ownClientId = "";
-            cameraClientId = "";
-            if (!statusEl.classList.contains("error")) {
-                setStatus("Disconnected");
-            }
+            ownClientId = ""; cameraClientId = "";
+            if (!statusEl.classList.contains("error")) setStatus("Disconnected");
             settingsPanel.style.display = "";
             showVideo(false);
             connectBtn.disabled = false;
         }
 
+        /* ── Connect ────────────────────────────────────────────────────── */
         connectBtn.addEventListener("click", async () => {
             const server = serverInput.value.trim();
-            const token = tokenInput.value.trim();
-            if (!server || !token) {
-                setError("Please enter server address and token");
-                return;
-            }
+            const token  = tokenInput.value.trim();
+            if (!server || !token) { setError("Please enter server address and token"); return; }
+            roomName = roomInput.value.trim() || "baby";
             localStorage.setItem("signaling_server", server);
-            localStorage.setItem("signaling_token", token);
+            localStorage.setItem("signaling_token",  token);
+            localStorage.setItem("room_name",         roomName);
+            localStorage.setItem("turn_url",  turnUrlInput.value.trim());
+            localStorage.setItem("turn_user", turnUserInput.value.trim());
+            localStorage.setItem("turn_cred", turnCredInput.value);
             await connect(server, token);
         });
-
-        disconnectBtn.addEventListener("click", () => { disconnect(true); });
-        retryAudioBtn.addEventListener("click", () => { ensurePlayback(true); });
+        disconnectBtn.addEventListener("click", () => disconnect(true));
+        retryAudioBtn.addEventListener("click", () => ensurePlayback(true));
 
         async function connect(server, token) {
             disconnect(false);
             userInitiatedDisconnect = false;
             setStatus("Connecting to signaling...");
             connectBtn.disabled = true;
+            startHealthPolling(server);
 
             try {
-                signalingWs = new WebSocket(`ws://${server}`);
+                // #16 auto-select wss:// when page served from https://
+                const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+                signalingWs = new WebSocket(`${scheme}://${server}`);
 
                 signalingWs.onopen = () => {
                     setStatus("Signaling connected, joining room...");
-                    signalingWs.send(JSON.stringify({
-                        type: "join", room: roomName, role: "viewer", token
-                    }));
+                    serverBanner.classList.remove("visible");
+                    signalingWs.send(JSON.stringify({ type: "join", room: roomName, role: "viewer", token }));
                 };
 
-                signalingWs.onmessage = async (event) => {
-                    const msg = JSON.parse(event.data);
+                signalingWs.onmessage = async ({ data }) => {
+                    const msg = JSON.parse(data);
                     switch (msg.type) {
                         case "joined":
                             ownClientId = msg.clientId || "";
+                            // #9 store server-provided ICE servers
+                            if (msg.iceServers) window._serverIceServers = msg.iceServers;
                             setStatus("Joined room, waiting for camera...");
                             settingsPanel.style.display = "none";
                             showVideo(true);
@@ -299,84 +504,83 @@
                         case "peer_left":
                             if (msg.role === "camera") {
                                 setStatus("Camera disconnected, waiting for reconnect...");
-                                closePeerConnection();
-                                cameraClientId = "";
+                                closePeerConnection(); cameraClientId = "";
                             }
                             break;
-                        case "offer":
-                            await handleOffer(msg.sdp, msg.from || "");
-                            break;
-                        case "ice":
-                            await handleIceCandidate(msg.candidate, msg.from || "");
-                            break;
-                        case "error":
-                            setError(`Server error: ${msg.message}`);
-                            disconnect(false);
-                            break;
+                        case "offer":         await handleOffer(msg.sdp, msg.from || "");          break;
+                        case "ice":           await handleIceCandidate(msg.candidate, msg.from || ""); break;
+                        case "cry_detected":  showCryToast(); break;   // #5
+                        case "error":         setError(`Server error: ${msg.message}`); disconnect(false); break;
                     }
                 };
 
-                signalingWs.onerror = (error) => {
-                    console.error("Signaling error:", error);
-                    setError("Signaling connection error");
-                    disconnect(false);
-                };
-
-                signalingWs.onclose = () => {
-                    if (!userInitiatedDisconnect && !statusEl.classList.contains("error")) {
+                signalingWs.onerror   = () => { setError("Signaling connection error"); disconnect(false); };
+                signalingWs.onclose   = () => {
+                    if (!userInitiatedDisconnect && !statusEl.classList.contains("error"))
                         setStatus("Signaling disconnected");
-                    }
                     connectBtn.disabled = false;
                 };
-            } catch (error) {
-                setError(`Failed to connect: ${error.message}`);
+            } catch (err) {
+                setError(`Failed to connect: ${err.message}`);
                 connectBtn.disabled = false;
             }
+        }
+
+        /* ── RTCPeerConnection ──────────────────────────────────────────── */
+        function buildIceServers() {
+            // #9 merge server-provided TURN + user-configured TURN + Google STUN
+            const servers = [...(window._serverIceServers || [])];
+            const tUrl  = localStorage.getItem("turn_url")  || "";
+            if (tUrl) {
+                const e = { urls: tUrl };
+                const u = localStorage.getItem("turn_user") || "";
+                const c = localStorage.getItem("turn_cred") || "";
+                if (u) e.username   = u;
+                if (c) e.credential = c;
+                servers.push(e);
+            }
+            servers.push({ urls: "stun:stun.l.google.com:19302" });
+            return servers;
         }
 
         function ensurePeerConnection() {
             if (peerConnection) return;
             remoteDescriptionSet = false;
             pendingRemoteIceCandidates = [];
-            peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-            });
+            peerConnection = new RTCPeerConnection({ iceServers: buildIceServers() });
 
-            peerConnection.onicecandidate = (event) => {
-                if (!event.candidate || !cameraClientId) return;
-                if (signalingWs && signalingWs.readyState === WebSocket.OPEN) {
+            peerConnection.onicecandidate = ({ candidate }) => {
+                if (!candidate || !cameraClientId) return;
+                if (signalingWs?.readyState === WebSocket.OPEN) {
                     signalingWs.send(JSON.stringify({
                         type: "ice", room: roomName, to: cameraClientId,
                         candidate: {
-                            sdpMid: event.candidate.sdpMid,
-                            sdpMLineIndex: event.candidate.sdpMLineIndex,
-                            candidate: event.candidate.candidate
+                            sdpMid: candidate.sdpMid,
+                            sdpMLineIndex: candidate.sdpMLineIndex,
+                            candidate: candidate.candidate,
                         }
                     }));
                 }
             };
 
-            peerConnection.ontrack = (event) => {
-                if (event.streams && event.streams[0]) {
-                    remoteVideo.srcObject = event.streams[0];
+            peerConnection.ontrack = ({ streams }) => {
+                if (streams?.[0]) {
+                    remoteVideo.srcObject = streams[0];
                     setStatus("Streaming", "connected");
                     ensurePlayback(false);
+                    acquireWakeLock();   // #7
+                    startStats();        // #11
                 }
             };
 
             peerConnection.oniceconnectionstatechange = () => {
                 if (!peerConnection) return;
-                const state = peerConnection.iceConnectionState;
-                if (state === "failed" || state === "disconnected") {
-                    setError("Connection lost");
-                }
+                const s = peerConnection.iceConnectionState;
+                if (s === "failed" || s === "disconnected") setError("Connection lost");
             };
 
             peerConnection.onconnectionstatechange = () => {
-                if (!peerConnection) return;
-                if (peerConnection.connectionState === "connected") {
-                    setStatus("Streaming", "connected");
-                }
+                if (peerConnection?.connectionState === "connected") setStatus("Streaming", "connected");
             };
         }
 
@@ -389,74 +593,58 @@
                 await flushPendingRemoteIceCandidates();
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
-                signalingWs.send(JSON.stringify({
-                    type: "answer", room: roomName, to: cameraClientId, sdp: answer.sdp
-                }));
+                signalingWs.send(JSON.stringify({ type: "answer", room: roomName, to: cameraClientId, sdp: answer.sdp }));
                 setStatus("Connected, waiting for media...");
-            } catch (error) {
-                setError(`Failed to handle offer: ${error.message}`);
-            }
+            } catch (e) { setError(`Offer failed: ${e.message}`); }
         }
 
         async function handleIceCandidate(candidate, fromClientId) {
             if (fromClientId) cameraClientId = fromClientId;
-            if (!peerConnection || !remoteDescriptionSet) {
-                pendingRemoteIceCandidates.push(candidate);
-                return;
-            }
+            if (!peerConnection || !remoteDescriptionSet) { pendingRemoteIceCandidates.push(candidate); return; }
             try {
                 await peerConnection.addIceCandidate(new RTCIceCandidate({
                     sdpMid: candidate.sdpMid,
                     sdpMLineIndex: candidate.sdpMLineIndex,
-                    candidate: candidate.candidate
+                    candidate: candidate.candidate,
                 }));
-            } catch (error) {
-                console.error("Failed to add ICE candidate:", error);
-            }
+            } catch (e) { console.error("ICE candidate error:", e); }
         }
 
         async function flushPendingRemoteIceCandidates() {
-            if (!peerConnection || !remoteDescriptionSet || pendingRemoteIceCandidates.length === 0) return;
-            const queue = pendingRemoteIceCandidates.slice();
-            pendingRemoteIceCandidates = [];
-            for (const candidate of queue) {
-                try {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate({
-                        sdpMid: candidate.sdpMid,
-                        sdpMLineIndex: candidate.sdpMLineIndex,
-                        candidate: candidate.candidate
-                    }));
-                } catch (error) {
-                    console.error("Failed to add queued ICE candidate:", error);
-                }
+            if (!peerConnection || !remoteDescriptionSet || !pendingRemoteIceCandidates.length) return;
+            const queue = pendingRemoteIceCandidates.splice(0);
+            for (const c of queue) {
+                try { await peerConnection.addIceCandidate(new RTCIceCandidate(c)); }
+                catch (e) { console.error("Queued ICE error:", e); }
             }
         }
 
         function ensurePlayback(userTriggered) {
             if (!remoteVideo.srcObject) return;
             remoteVideo.muted = false;
-            const playPromise = remoteVideo.play();
-            if (playPromise && typeof playPromise.then === "function") {
-                playPromise.then(() => {
+            const p = remoteVideo.play();
+            if (p?.then) {
+                p.then(() => {
                     retryAudioBtn.style.display = "none";
-                    if (userTriggered && !statusEl.classList.contains("error")) {
-                        setStatus("Streaming", "connected");
-                    }
+                    if (userTriggered && !statusEl.classList.contains("error")) setStatus("Streaming", "connected");
                 }).catch(() => {
                     retryAudioBtn.style.display = "inline-flex";
-                    if (!statusEl.classList.contains("error")) {
-                        setStatus("Tap Retry Audio to start sound");
-                    }
+                    if (!statusEl.classList.contains("error")) setStatus("Tap Retry Audio to start sound");
                 });
             }
         }
 
+        /* ── Load saved values ──────────────────────────────────────────── */
         window.addEventListener("load", () => {
-            const savedServer = localStorage.getItem("signaling_server");
-            const savedToken  = localStorage.getItem("signaling_token");
-            if (savedServer) serverInput.value = savedServer;
-            if (savedToken)  tokenInput.value  = savedToken;
+            const saved = k => localStorage.getItem(k) || "";
+            if (saved("signaling_server")) serverInput.value  = saved("signaling_server");
+            if (saved("signaling_token"))  tokenInput.value   = saved("signaling_token");
+            if (saved("room_name"))        roomInput.value    = saved("room_name");
+            if (saved("turn_url"))         turnUrlInput.value  = saved("turn_url");
+            if (saved("turn_user"))        turnUserInput.value = saved("turn_user");
+            if (saved("turn_cred"))        turnCredInput.value = saved("turn_cred");
         });
+    })();
     </script>
 </body>
 </html>

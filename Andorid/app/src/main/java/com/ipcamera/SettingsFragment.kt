@@ -18,7 +18,6 @@ class SettingsFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         binding = SettingsFragmentBinding.inflate(inflater, container, false)
-
         return binding.root
     }
 
@@ -32,60 +31,83 @@ class SettingsFragment : Fragment() {
 
         val prefs = SettingsPreferences(requireContext().applicationContext)
 
-        prefs.getIpAddress()?.let { ipAddress ->
-            binding.editTextIp.setText(ipAddress)
-        }
+        // ── Connection ────────────────────────────────────────────────────────
+        prefs.getIpAddress()?.let { binding.editTextIp.setText(it) }
+        prefs.getSignalingToken()?.let { binding.editTextToken.setText(it) }
+        binding.editTextRoom.setText(prefs.getRoomName())
 
-        prefs.getSignalingToken()?.let { token ->
-            binding.editTextToken.setText(token)
-        }
-
-        // Defaults: rear camera + standard quality + STUN off
+        // ── Camera ────────────────────────────────────────────────────────────
         when (prefs.getCameraFacing()) {
             "front" -> binding.toggleCameraFacing.check(R.id.btn_camera_front)
-            else -> binding.toggleCameraFacing.check(R.id.btn_camera_back)
+            else    -> binding.toggleCameraFacing.check(R.id.btn_camera_back)
         }
-
         when (prefs.getQualityPreset()) {
-            "low" -> binding.toggleQuality.check(R.id.btn_quality_low)
+            "low"  -> binding.toggleQuality.check(R.id.btn_quality_low)
             "high" -> binding.toggleQuality.check(R.id.btn_quality_high)
-            else -> binding.toggleQuality.check(R.id.btn_quality_medium)
+            else   -> binding.toggleQuality.check(R.id.btn_quality_medium)
         }
 
-        binding.switchStun.isChecked = prefs.isStunFallbackEnabled()
+        // ── Switches ──────────────────────────────────────────────────────────
+        binding.switchStun.isChecked       = prefs.isStunFallbackEnabled()
+        binding.switchNightMode.isChecked  = prefs.isNightModeEnabled()
+        binding.switchCryDetect.isChecked  = prefs.isCryDetectEnabled()
 
+        // ── ntfy ──────────────────────────────────────────────────────────────
+        binding.editTextNtfyTopic.setText(prefs.getNtfyTopic())
+        val savedBaseUrl = prefs.getNtfyBaseUrl()
+        if (savedBaseUrl != "https://ntfy.sh") {
+            binding.editTextNtfyBaseUrl.setText(savedBaseUrl)
+        }
+
+        // ── TURN ──────────────────────────────────────────────────────────────
+        binding.editTextTurnUrl.setText(prefs.getTurnUrl())
+        binding.editTextTurnUser.setText(prefs.getTurnUsername())
+        binding.editTextTurnCred.setText(prefs.getTurnCredential())
+
+        // Clear validation errors on typing
         binding.editTextIp.addTextChangedListener {
-            if (binding.textInputIp.error != null) {
-                binding.textInputIp.error = null
-            }
+            if (binding.textInputIp.error != null) binding.textInputIp.error = null
         }
 
+        // ── Save ──────────────────────────────────────────────────────────────
         binding.btnSave.setOnClickListener {
-            val input = binding.editTextIp.text?.toString() ?: ""
-
-            val portSeparatorCount = input.count { it == ':' }
-
-            if (portSeparatorCount != 1 || input.length <= 10) {
+            val ipInput = binding.editTextIp.text?.toString() ?: ""
+            val colonCount = ipInput.count { it == ':' }
+            if (colonCount != 1 || ipInput.length <= 10) {
                 binding.textInputIp.error = "Invalid IP format provided"
                 return@setOnClickListener
             }
 
-            val token = binding.editTextToken.text?.toString() ?: ""
+            prefs.saveIpAddress(ipInput)
+            prefs.saveSignalingToken(binding.editTextToken.text?.toString() ?: "")
+            prefs.setRoomName(binding.editTextRoom.text?.toString() ?: "baby")
 
-            prefs.saveIpAddress(input)
-            prefs.saveSignalingToken(token)
             prefs.setCameraFacing(
                 if (binding.toggleCameraFacing.checkedButtonId == R.id.btn_camera_front) "front" else "back"
             )
             prefs.setQualityPreset(
                 when (binding.toggleQuality.checkedButtonId) {
-                    R.id.btn_quality_low -> "low"
+                    R.id.btn_quality_low  -> "low"
                     R.id.btn_quality_high -> "high"
-                    else -> "medium"
+                    else                  -> "medium"
                 }
             )
-            prefs.setStunFallbackEnabled(binding.switchStun.isChecked)
 
+            prefs.setStunFallbackEnabled(binding.switchStun.isChecked)
+            prefs.setNightModeEnabled(binding.switchNightMode.isChecked)
+            prefs.setCryDetectEnabled(binding.switchCryDetect.isChecked)
+
+            // ntfy
+            prefs.setNtfyTopic(binding.editTextNtfyTopic.text?.toString() ?: "")
+            val ntfyBase = binding.editTextNtfyBaseUrl.text?.toString()?.trim() ?: ""
+            prefs.setNtfyBaseUrl(ntfyBase)
+
+            // TURN
+            prefs.setTurnUrl(binding.editTextTurnUrl.text?.toString() ?: "")
+            prefs.setTurnUsername(binding.editTextTurnUser.text?.toString() ?: "")
+            prefs.setTurnCredential(binding.editTextTurnCred.text?.toString() ?: "")
+
+            @Suppress("DEPRECATION")
             activity?.onBackPressed()
         }
     }

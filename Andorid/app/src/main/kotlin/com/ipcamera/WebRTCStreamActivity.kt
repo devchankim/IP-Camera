@@ -5,12 +5,14 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.os.Handler
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.widget.Toast
@@ -27,10 +29,17 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * WebRTC Camera (offerer) Activity
- * - Connects to signaling server (ws://<IP>:8081)
- * - Captures camera+mic
- * - Sends offer → receives answer → streams P2P to browser
- * - Uses foreground service for 24/7 operation
+ *
+ * Features:
+ *  #1  Infinite reconnection with exponential back-off (capped at 30 s)
+ *  #2  Keepalive ping every 15 s to detect silent WebSocket drops
+ *  #4  Battery-optimisation exemption request on startup
+ *  #5  Cry detection → broadcasts "cry_detected" to all viewers via signaling
+ *  #6  H.264 codec preference (SDP munging) + night-mode low-fps option
+ *  #8  Motion detection (VideoSink frame-diff) → ntfy push notification
+ *  #9  TURN server support from Settings
+ *  #10 Adaptive max-bitrate via RtpSender.setParameters() + periodic stats
+ *  #15 Dynamic room name from Settings (default: "baby")
  */
 class WebRTCStreamActivity : AppCompatActivity() {
 
@@ -48,29 +57,63 @@ class WebRTCStreamActivity : AppCompatActivity() {
 
     // Signaling
     private var signalingClient: WebSocketClient? = null
-    private val roomName = "baby"
+    private var roomName = "baby"
     private var signalingToken = ""
     private var signalingServerAddress: String = ""
     private var reconnectAttempts = 0
-    private val maxReconnectAttempts = 5
     private val reconnectHandler = Handler(Looper.getMainLooper())
     private var userStopped = false
     private var sessionActive = false
+    private var localClientId: String = ""
+
+    // Settings
     private var allowStunFallback = false
     private var cameraFacingPref = "back"
     private var qualityPref = "medium"
-    private var localClientId: String = ""
+    private var nightModePref = false
+    private var cryDetectEnabled = false
+    private var ntfyTopicPref = ""
+    private var ntfyBaseUrl = "https://ntfy.sh"
+    private var turnUrl = ""
+    private var turnUsername = ""
+    private var turnCredential = ""
+
+    // #2 Keepalive ping
+    private val pingHandler = Handler(Looper.getMainLooper())
+    private val pingRunnable = object : Runnable {
+        override fun run() {
+            try { signalingClient?.sendPing() } catch (_: Exception) {}
+            pingHandler.postDelayed(this, 15_000L)
+        }
+    }
+
+    // #5 Cry detection
+    private var cryDetector: CryDetector? = null
+    private var lastCrySentMs = 0L
+    private val CRY_COOLDOWN_MS = 10_000L
+
+    // #8 Motion detection
+    private var motionDetector: MotionDetector? = null
+    private var lastMotionSentMs = 0L
+    private val MOTION_COOLDOWN_MS = 60_000L
+
+    // #10 Adaptive bitrate
+    private val bitrateHandler = Handler(Looper.getMainLooper())
+    private val bitrateRunnable = object : Runnable {
+        override fun run() {
+            adjustBitrate()
+            bitrateHandler.postDelayed(this, 5_000L)
+        }
+    }
 
     // Foreground service
     private var streamingService: StreamingForegroundService? = null
     private var serviceBound = false
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            val localBinder = binder as StreamingForegroundService.LocalBinder
-            streamingService = localBinder.getService()
+            streamingService = (binder as StreamingForegroundService.LocalBinder).getService()
             serviceBound = true
         }
-
         override fun onServiceDisconnected(name: ComponentName?) {
             streamingService = null
             serviceBound = false
@@ -88,6 +131,8 @@ class WebRTCStreamActivity : AppCompatActivity() {
         val pendingRemoteIceCandidates: ArrayDeque<IceCandidate> = ArrayDeque(),
     )
 
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -100,24 +145,18 @@ class WebRTCStreamActivity : AppCompatActivity() {
         EdgeToEdge.setInsetsHandler(
             root = binding.root,
             handler = StreamActivityInsetsHandler { systemBarInsets ->
-                // Adjust bottom margin for button
                 binding.btnToggle.setPadding(0, 0, 0, systemBarInsets.bottom + 20)
             }
         )
 
-        // Read server IP + token from preferences
-        val prefs = SettingsPreferences(applicationContext)
-        val serverAddress = prefs.getIpAddress() ?: "192.168.0.101:8081"
-        signalingToken = prefs.getSignalingToken() ?: ""
-        allowStunFallback = prefs.isStunFallbackEnabled()
-        cameraFacingPref = prefs.getCameraFacing()
-        qualityPref = prefs.getQualityPreset()
-        signalingServerAddress = serverAddress
+        // #4 Battery optimisation exemption
+        requestBatteryOptimizationExemption()
+
+        loadPrefs()
 
         binding.tvStatus.text = "Status: Not connected"
 
         binding.btnBack.setOnClickListener {
-            // Ensure resources are released before leaving.
             if (sessionActive) stopStream()
             finish()
         }
@@ -134,7 +173,7 @@ class WebRTCStreamActivity : AppCompatActivity() {
                 stopStream()
             } else {
                 if (checkPermissions()) {
-                    startStream(serverAddress)
+                    startStream(signalingServerAddress)
                 } else {
                     requestPermissions()
                 }
@@ -142,23 +181,36 @@ class WebRTCStreamActivity : AppCompatActivity() {
         }
     }
 
+    private fun loadPrefs() {
+        val prefs = SettingsPreferences(applicationContext)
+        signalingServerAddress = prefs.getIpAddress() ?: "192.168.0.101:8081"
+        signalingToken         = prefs.getSignalingToken() ?: ""
+        roomName               = prefs.getRoomName()
+        allowStunFallback      = prefs.isStunFallbackEnabled()
+        cameraFacingPref       = prefs.getCameraFacing()
+        qualityPref            = prefs.getQualityPreset()
+        nightModePref          = prefs.isNightModeEnabled()
+        cryDetectEnabled       = prefs.isCryDetectEnabled()
+        ntfyTopicPref          = prefs.getNtfyTopic()
+        ntfyBaseUrl            = prefs.getNtfyBaseUrl()
+        turnUrl                = prefs.getTurnUrl()
+        turnUsername           = prefs.getTurnUsername()
+        turnCredential         = prefs.getTurnCredential()
+    }
+
+    // ── Permissions ───────────────────────────────────────────────────────────
+
     private fun checkPermissions(): Boolean {
-        val basePerms = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        
-        // Android 13+ requires POST_NOTIFICATIONS for foreground service
+        val base = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
+                   ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            basePerms && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        } else {
-            basePerms
-        }
+            base && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else base
     }
 
     private fun requestPermissions() {
         val perms = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            perms.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) perms.add(Manifest.permission.POST_NOTIFICATIONS)
         ActivityCompat.requestPermissions(this, perms.toTypedArray(), PERMISSION_REQUEST_CODE)
     }
 
@@ -166,59 +218,59 @@ class WebRTCStreamActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                val prefs = SettingsPreferences(applicationContext)
-                val serverAddress = prefs.getIpAddress() ?: "192.168.0.101:8081"
-                signalingToken = prefs.getSignalingToken() ?: ""
-                allowStunFallback = prefs.isStunFallbackEnabled()
-                cameraFacingPref = prefs.getCameraFacing()
-                qualityPref = prefs.getQualityPreset()
-                signalingServerAddress = serverAddress
-                startStream(serverAddress)
+                loadPrefs()
+                startStream(signalingServerAddress)
             } else {
                 Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
+    // ── #4 Battery optimisation ───────────────────────────────────────────────
+
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(PowerManager::class.java)
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    })
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    // ── Stream lifecycle ──────────────────────────────────────────────────────
+
     private fun startStream(serverAddress: String) {
         sessionActive = true
         binding.btnToggle.text = "Stop"
-        binding.tvStatus.text = "Starting..."
-        userStopped = false
+        binding.tvStatus.text  = "Starting..."
+        userStopped     = false
         reconnectAttempts = 0
         signalingServerAddress = serverAddress
 
         // Start foreground service
         val serviceIntent = Intent(this, StreamingForegroundService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent)
+        else startService(serviceIntent)
         bindService(serviceIntent, serviceConnection, BIND_AUTO_CREATE)
 
-        // Initialize WebRTC
+        // Initialise WebRTC
         eglBase = EglBase.create()
-        val initOptions = PeerConnectionFactory.InitializationOptions.builder(this)
-            .setEnableInternalTracer(false)
-            .createInitializationOptions()
-        PeerConnectionFactory.initialize(initOptions)
-
-        val options = PeerConnectionFactory.Options()
-        val encoderFactory = DefaultVideoEncoderFactory(
-            eglBase!!.eglBaseContext,
-            true,
-            true
+        PeerConnectionFactory.initialize(
+            PeerConnectionFactory.InitializationOptions.builder(this)
+                .setEnableInternalTracer(false)
+                .createInitializationOptions()
         )
-        val decoderFactory = DefaultVideoDecoderFactory(eglBase!!.eglBaseContext)
-
         peerConnectionFactory = PeerConnectionFactory.builder()
-            .setOptions(options)
-            .setVideoEncoderFactory(encoderFactory)
-            .setVideoDecoderFactory(decoderFactory)
+            .setOptions(PeerConnectionFactory.Options())
+            .setVideoEncoderFactory(DefaultVideoEncoderFactory(eglBase!!.eglBaseContext, true, true))
+            .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase!!.eglBaseContext))
             .createPeerConnectionFactory()
 
-        // Video capturer (front camera)
+        // Camera capturer
         videoCapturer = createCameraCapturer(Camera2Enumerator(this), cameraFacingPref)
         if (videoCapturer == null) {
             Toast.makeText(this, "Failed to open camera", Toast.LENGTH_SHORT).show()
@@ -229,180 +281,167 @@ class WebRTCStreamActivity : AppCompatActivity() {
         val videoSource = peerConnectionFactory.createVideoSource(videoCapturer!!.isScreencast)
         videoCapturer!!.initialize(surfaceTextureHelper, this, videoSource.capturerObserver)
 
-        val powerManager = getSystemService(PowerManager::class.java)
-        val effectivePreset = if (powerManager?.isPowerSaveMode == true) "low" else qualityPref
-        val (w, h, fps) = when (effectivePreset) {
-            "low" -> Triple(480, 360, 15)
-            "high" -> Triple(1280, 720, 30)
-            else -> Triple(640, 480, 24)
-        }
-        videoCapturer!!.startCapture(w, h, fps)
+        // #6 Resolve capture parameters
+        val (capW, capH, capFps) = resolveCaptureParams()
+        videoCapturer!!.startCapture(capW, capH, capFps)
 
         localVideoTrack = peerConnectionFactory.createVideoTrack("video0", videoSource)
         localVideoTrack?.setEnabled(true)
 
         // Audio
-        val audioConstraints = MediaConstraints()
-        val audioSource = peerConnectionFactory.createAudioSource(audioConstraints)
+        val audioSource = peerConnectionFactory.createAudioSource(MediaConstraints())
         localAudioTrack = peerConnectionFactory.createAudioTrack("audio0", audioSource)
         localAudioTrack?.setEnabled(true)
         binding.btnMute.text = "Mute"
         binding.btnMute.isEnabled = true
 
-        // Render local preview (landscape: no mirror for back cam, fill frame)
+        // Local preview
         binding.localView.init(eglBase!!.eglBaseContext, null)
         binding.localView.setMirror(cameraFacingPref == "front")
-        binding.localView.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+        binding.localView.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
         localVideoTrack?.addSink(binding.localView)
 
-        // Connect to signaling
+        // #8 Motion detector — attach as additional VideoSink
+        motionDetector = MotionDetector(
+            onMotionDetected = {
+                val now = System.currentTimeMillis()
+                if (now - lastMotionSentMs > MOTION_COOLDOWN_MS) {
+                    lastMotionSentMs = now
+                    NtfyNotifier.send(
+                        topic    = ntfyTopicPref,
+                        title    = "👶 Motion detected",
+                        message  = "Movement detected by the baby cam",
+                        priority = "default",
+                        baseUrl  = ntfyBaseUrl,
+                    )
+                }
+            },
+            onMotionStopped = { /* nothing needed */ },
+        )
+        localVideoTrack?.addSink(motionDetector!!)
+
+        // #5 Cry detector — starts its own AudioRecord thread
+        if (cryDetectEnabled) {
+            cryDetector = CryDetector(
+                onCryDetected = {
+                    val now = System.currentTimeMillis()
+                    if (now - lastCrySentMs > CRY_COOLDOWN_MS) {
+                        lastCrySentMs = now
+                        sendCryDetectedSignal()
+                    }
+                },
+                onSilenceRestored = { /* nothing needed */ },
+            ).also { it.start() }
+        }
+
         connectSignaling(serverAddress)
     }
 
-    private fun createCameraCapturer(
-        enumerator: CameraEnumerator,
-        preferredFacing: String
-    ): CameraVideoCapturer? {
-        val wantBack = preferredFacing != "front"
-
-        fun tryFacing(isWanted: (String) -> Boolean): CameraVideoCapturer? {
-            for (deviceName in enumerator.deviceNames) {
-                if (isWanted(deviceName)) {
-                    return enumerator.createCapturer(deviceName, null)
-                }
-            }
-            return null
-        }
-
-        return if (wantBack) {
-            tryFacing { enumerator.isBackFacing(it) } ?: tryFacing { enumerator.isFrontFacing(it) }
-        } else {
-            tryFacing { enumerator.isFrontFacing(it) } ?: tryFacing { enumerator.isBackFacing(it) }
+    // #6 Resolve capture resolution / fps considering night mode + quality preset + power saver
+    private fun resolveCaptureParams(): Triple<Int, Int, Int> {
+        if (nightModePref) return Triple(640, 480, 15)
+        val pm = getSystemService(PowerManager::class.java)
+        val effective = if (pm?.isPowerSaveMode == true) "low" else qualityPref
+        return when (effective) {
+            "low"  -> Triple(480, 360, 15)
+            "high" -> Triple(1280, 720, 30)
+            else   -> Triple(640, 480, 24)
         }
     }
 
+    private fun createCameraCapturer(enumerator: CameraEnumerator, preferredFacing: String): CameraVideoCapturer? {
+        val wantBack = preferredFacing != "front"
+        fun tryFacing(isWanted: (String) -> Boolean): CameraVideoCapturer? {
+            for (device in enumerator.deviceNames) if (isWanted(device)) return enumerator.createCapturer(device, null)
+            return null
+        }
+        return if (wantBack) tryFacing { enumerator.isBackFacing(it) } ?: tryFacing { enumerator.isFrontFacing(it) }
+        else                  tryFacing { enumerator.isFrontFacing(it) } ?: tryFacing { enumerator.isBackFacing(it) }
+    }
+
+    // ── Signaling ─────────────────────────────────────────────────────────────
+
     private fun connectSignaling(serverAddress: String) {
         binding.tvStatus.text = "Connecting to signaling..."
-
         val uri = URI("ws://$serverAddress")
         signalingClient = object : WebSocketClient(uri) {
-            override fun onOpen(handshakedata: ServerHandshake?) {
-                Log.d(TAG, "Signaling: connected")
+            override fun onOpen(h: ServerHandshake?) {
                 reconnectAttempts = 0
-                runOnUiThread {
-                    binding.tvStatus.text = "Signaling: connected, joining room..."
-                }
-
-                // Send join
-                val joinMsg = JSONObject().apply {
+                runOnUiThread { binding.tvStatus.text = "Signaling: connected, joining room..." }
+                // #2 Start keepalive
+                pingHandler.post(pingRunnable)
+                send(JSONObject().apply {
                     put("type", "join")
                     put("room", roomName)
                     put("role", "camera")
                     put("token", signalingToken)
-                }
-                send(joinMsg.toString())
+                }.toString())
             }
 
             override fun onMessage(message: String?) {
-                Log.d(TAG, "Signaling: $message")
                 message ?: return
+                Log.d(TAG, "Signaling: $message")
                 try {
                     val json = JSONObject(message)
                     when (json.getString("type")) {
-                        "joined" -> onJoined(json.optString("clientId", ""))
-                        "peer_joined" -> onPeerJoined(
-                            json.optString("role", ""),
-                            json.optString("clientId", "")
-                        )
-                        "peer_left" -> onPeerLeft(
-                            json.optString("role", ""),
-                            json.optString("clientId", "")
-                        )
-                        "answer" -> onAnswer(
-                            json.optString("from", ""),
-                            json.getString("sdp")
-                        )
-                        "ice" -> onIceCandidate(
-                            json.optString("from", ""),
-                            json.getJSONObject("candidate")
-                        )
-                        "error" -> {
-                            val err = json.optString("message", "Unknown error")
+                        "joined"     -> onJoined(json.optString("clientId", ""))
+                        "peer_joined"-> onPeerJoined(json.optString("role",""), json.optString("clientId",""))
+                        "peer_left"  -> onPeerLeft(json.optString("role",""), json.optString("clientId",""))
+                        "answer"     -> onAnswer(json.optString("from",""), json.getString("sdp"))
+                        "ice"        -> onIceCandidate(json.optString("from",""), json.getJSONObject("candidate"))
+                        "error"      -> {
+                            val err = json.optString("message","Unknown error")
                             runOnUiThread {
                                 Toast.makeText(this@WebRTCStreamActivity, "Signaling error: $err", Toast.LENGTH_SHORT).show()
                                 binding.tvStatus.text = "Error: $err"
                             }
                         }
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to parse signaling message", e)
-                }
+                } catch (e: Exception) { Log.e(TAG, "Failed to parse signaling message", e) }
             }
 
             override fun onClose(code: Int, reason: String?, remote: Boolean) {
-                Log.d(TAG, "Signaling: closed $reason")
+                Log.d(TAG, "Signaling closed: $reason")
+                pingHandler.removeCallbacks(pingRunnable)
                 closeAllPeerSessions()
-                runOnUiThread {
-                    binding.tvStatus.text = "Signaling: disconnected"
-                }
-
-                if (!userStopped) {
-                    scheduleReconnect()
-                }
+                runOnUiThread { binding.tvStatus.text = "Signaling: disconnected" }
+                if (!userStopped) scheduleReconnect()
             }
 
-            override fun onError(ex: Exception?) {
-                Log.e(TAG, "Signaling error", ex)
-            }
+            override fun onError(ex: Exception?) { Log.e(TAG, "Signaling error", ex) }
         }
         signalingClient?.connect()
     }
 
+    // #1 Infinite reconnect with exponential back-off capped at 30 s
     private fun scheduleReconnect() {
-        if (reconnectAttempts >= maxReconnectAttempts) return
-        reconnectAttempts += 1
-        val delayMs = (1000L * reconnectAttempts * reconnectAttempts).coerceAtMost(10_000L)
-        runOnUiThread {
-            binding.tvStatus.text = "Reconnecting... ($reconnectAttempts/$maxReconnectAttempts)"
-        }
+        reconnectAttempts++
+        val delayMs = (1000L * reconnectAttempts * reconnectAttempts).coerceAtMost(30_000L)
+        runOnUiThread { binding.tvStatus.text = "Reconnecting (attempt $reconnectAttempts)..." }
         reconnectHandler.postDelayed({
-            if (!userStopped) {
-                connectSignaling(signalingServerAddress)
-            }
+            if (!userStopped) connectSignaling(signalingServerAddress)
         }, delayMs)
     }
 
+    // ── Signaling message handlers ────────────────────────────────────────────
+
     private fun onJoined(clientId: String) {
         localClientId = clientId
-        runOnUiThread {
-            binding.tvStatus.text = "Joined room, waiting for viewer..."
-        }
+        runOnUiThread { binding.tvStatus.text = "Joined room \"$roomName\", waiting for viewer..." }
     }
 
     private fun onPeerJoined(role: String, clientId: String) {
-        if (role != "viewer" || clientId.isBlank()) {
-            return
-        }
-
-        runOnUiThread {
-            binding.tvStatus.text = "Viewer connected (${peerSessions.size + 1}), creating offer..."
-        }
-
-        if (peerSessions.containsKey(clientId)) {
-            return
-        }
-
+        if (role != "viewer" || clientId.isBlank()) return
+        runOnUiThread { binding.tvStatus.text = "Viewer connected (${peerSessions.size + 1}), creating offer..." }
+        if (peerSessions.containsKey(clientId)) return
         try {
-            val session = createPeerSession(clientId)
-            if (session == null) {
-                runOnUiThread {
-                    binding.tvStatus.text = "Failed to prepare session for viewer"
-                }
+            createPeerSession(clientId) ?: run {
+                runOnUiThread { binding.tvStatus.text = "Failed to prepare session for viewer" }
                 return
             }
-            createOffer(session.viewerId)
+            createOffer(clientId)
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to start WebRTC session for viewer=$clientId", t)
+            Log.e(TAG, "Failed to start WebRTC for viewer=$clientId", t)
             runOnUiThread {
                 binding.tvStatus.text = "WebRTC error: ${t.javaClass.simpleName}"
                 Toast.makeText(this, "WebRTC failed: ${t.message}", Toast.LENGTH_LONG).show()
@@ -412,288 +451,290 @@ class WebRTCStreamActivity : AppCompatActivity() {
     }
 
     private fun onPeerLeft(role: String, clientId: String) {
-        if (role != "viewer" || clientId.isBlank()) {
-            return
-        }
+        if (role != "viewer" || clientId.isBlank()) return
         closeViewerSession(clientId)
         runOnUiThread {
-            binding.tvStatus.text = if (peerSessions.isEmpty()) {
+            binding.tvStatus.text = if (peerSessions.isEmpty())
                 "Joined room, waiting for viewer..."
-            } else {
+            else
                 "Viewer disconnected, active viewers: ${peerSessions.size}"
-            }
         }
     }
+
+    // ── Peer session ──────────────────────────────────────────────────────────
 
     private fun createPeerSession(viewerId: String): PeerSession? {
         peerSessions[viewerId]?.let { return it }
 
-        val iceServers = if (allowStunFallback) {
-            listOf(
-                PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
-            )
-        } else {
-            emptyList()
+        val iceServers = buildList {
+            if (allowStunFallback) {
+                add(PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer())
+            }
+            // #9 TURN server
+            if (turnUrl.isNotBlank()) {
+                val builder = PeerConnection.IceServer.builder(turnUrl)
+                if (turnUsername.isNotBlank()) builder.setUsername(turnUsername)
+                if (turnCredential.isNotBlank()) builder.setPassword(turnCredential)
+                add(builder.createIceServer())
+            }
         }
 
-        // Keep RTCConfiguration minimal for broad device compatibility.
         val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
-            sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
-            bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
-            rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE
+            sdpSemantics             = PeerConnection.SdpSemantics.UNIFIED_PLAN
+            bundlePolicy             = PeerConnection.BundlePolicy.MAXBUNDLE
+            rtcpMuxPolicy            = PeerConnection.RtcpMuxPolicy.REQUIRE
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
         }
 
-        val peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
-            override fun onIceCandidate(candidate: IceCandidate?) {
-                candidate ?: return
-                Log.d(TAG, "onIceCandidate(viewer=$viewerId): ${candidate.sdp}")
-                val iceMsg = JSONObject().apply {
-                    put("type", "ice")
-                    put("room", roomName)
-                    put("to", viewerId)
+        val pc = peerConnectionFactory.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
+            override fun onIceCandidate(c: IceCandidate?) {
+                c ?: return
+                signalingClient?.send(JSONObject().apply {
+                    put("type", "ice"); put("room", roomName); put("to", viewerId)
                     put("candidate", JSONObject().apply {
-                        put("sdpMid", candidate.sdpMid)
-                        put("sdpMLineIndex", candidate.sdpMLineIndex)
-                        put("candidate", candidate.sdp)
+                        put("sdpMid", c.sdpMid)
+                        put("sdpMLineIndex", c.sdpMLineIndex)
+                        put("candidate", c.sdp)
                     })
-                }
-                signalingClient?.send(iceMsg.toString())
+                }.toString())
             }
-
-            override fun onIceGatheringChange(state: PeerConnection.IceGatheringState?) {
-                Log.d(TAG, "onIceGatheringChange: $state")
-            }
-
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
-                Log.d(TAG, "onIceConnectionChange(viewer=$viewerId): $state")
+                Log.d(TAG, "ICE state (viewer=$viewerId): $state")
                 runOnUiThread {
                     when (state) {
                         PeerConnection.IceConnectionState.CONNECTED -> {
                             binding.tvStatus.text = "Streaming to ${peerSessions.size} viewer(s)"
-                            binding.btnToggle.text = "Stop"
                             streamingService?.updateNotification("Streaming active")
+                            // #10 Start adaptive bitrate polling
+                            bitrateHandler.post(bitrateRunnable)
                         }
                         PeerConnection.IceConnectionState.DISCONNECTED,
                         PeerConnection.IceConnectionState.FAILED -> {
                             closeViewerSession(viewerId)
-                            binding.tvStatus.text = if (peerSessions.isEmpty()) {
+                            bitrateHandler.removeCallbacks(bitrateRunnable)
+                            binding.tvStatus.text = if (peerSessions.isEmpty())
                                 "Connection lost, waiting for viewer..."
-                            } else {
-                                "Viewer connection lost, active viewers: ${peerSessions.size}"
-                            }
+                            else
+                                "Viewer lost, active viewers: ${peerSessions.size}"
                             streamingService?.updateNotification("Connection lost")
                         }
                         else -> {}
                     }
                 }
             }
-
-            override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
-                Log.d(TAG, "onConnectionChange: $newState")
-            }
-
-            override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {}
-            override fun onIceConnectionReceivingChange(receiving: Boolean) {}
-            override fun onAddStream(stream: MediaStream?) {}
-            override fun onRemoveStream(stream: MediaStream?) {}
-            override fun onDataChannel(channel: DataChannel?) {}
+            override fun onIceGatheringChange(s: PeerConnection.IceGatheringState?) {}
+            override fun onConnectionChange(s: PeerConnection.PeerConnectionState?) {}
+            override fun onIceCandidatesRemoved(c: Array<out IceCandidate>?) {}
+            override fun onIceConnectionReceivingChange(r: Boolean) {}
+            override fun onAddStream(s: MediaStream?) {}
+            override fun onRemoveStream(s: MediaStream?) {}
+            override fun onDataChannel(c: DataChannel?) {}
             override fun onRenegotiationNeeded() {}
-            override fun onSignalingChange(state: PeerConnection.SignalingState?) {}
-            override fun onAddTrack(receiver: RtpReceiver?, streams: Array<out MediaStream>?) {}
-        })
+            override fun onSignalingChange(s: PeerConnection.SignalingState?) {}
+            override fun onAddTrack(r: RtpReceiver?, s: Array<out MediaStream>?) {}
+        }) ?: return null
 
-        if (peerConnection == null) {
-            return null
-        }
+        pc.addTrack(localVideoTrack ?: return null, listOf("stream0"))
+        pc.addTrack(localAudioTrack ?: return null, listOf("stream0"))
 
-        val videoTrack = localVideoTrack ?: return null
-        val audioTrack = localAudioTrack ?: return null
-
-        // Add local tracks to each viewer-specific peer connection.
-        peerConnection.addTrack(videoTrack, listOf("stream0"))
-        peerConnection.addTrack(audioTrack, listOf("stream0"))
-
-        val session = PeerSession(viewerId = viewerId, peerConnection = peerConnection)
+        val session = PeerSession(viewerId = viewerId, peerConnection = pc)
         peerSessions[viewerId] = session
         return session
     }
 
+    // ── Offer / Answer / ICE ──────────────────────────────────────────────────
+
     private fun createOffer(viewerId: String) {
         val session = peerSessions[viewerId] ?: return
-        val constraints = MediaConstraints()
-
         session.peerConnection.createOffer(object : SdpObserver {
             override fun onCreateSuccess(sdp: SessionDescription?) {
                 sdp ?: return
+                // #6 Prefer H.264
+                val mungedSdp = SessionDescription(sdp.type, preferH264(sdp.description))
                 session.peerConnection.setLocalDescription(object : SdpObserver {
                     override fun onSetSuccess() {
-                        Log.d(TAG, "setLocalDescription success viewer=$viewerId")
-                        val offerMsg = JSONObject().apply {
-                            put("type", "offer")
-                            put("room", roomName)
-                            put("to", viewerId)
-                            put("sdp", sdp.description)
-                        }
-                        signalingClient?.send(offerMsg.toString())
+                        signalingClient?.send(JSONObject().apply {
+                            put("type", "offer"); put("room", roomName)
+                            put("to", viewerId); put("sdp", mungedSdp.description)
+                        }.toString())
                     }
-
-                    override fun onSetFailure(error: String?) {
-                        Log.e(TAG, "setLocalDescription failed viewer=$viewerId: $error")
-                    }
-
-                    override fun onCreateSuccess(p0: SessionDescription?) {}
-                    override fun onCreateFailure(p0: String?) {}
-                }, sdp)
+                    override fun onSetFailure(e: String?) { Log.e(TAG, "setLocalDesc failed: $e") }
+                    override fun onCreateSuccess(p: SessionDescription?) {}
+                    override fun onCreateFailure(e: String?) {}
+                }, mungedSdp)
             }
-
             override fun onSetSuccess() {}
-            override fun onCreateFailure(error: String?) {
-                Log.e(TAG, "createOffer failed viewer=$viewerId: $error")
-            }
-
-            override fun onSetFailure(error: String?) {}
-        }, constraints)
+            override fun onCreateFailure(e: String?) { Log.e(TAG, "createOffer failed: $e") }
+            override fun onSetFailure(e: String?) {}
+        }, MediaConstraints())
     }
 
     private fun onAnswer(fromClientId: String, sdp: String) {
-        if (fromClientId.isBlank()) {
-            Log.w(TAG, "Received answer without from client id")
-            return
-        }
-        val session = peerSessions[fromClientId] ?: run {
-            Log.w(TAG, "No session for answer from viewer=$fromClientId")
-            return
-        }
-        Log.d(TAG, "Received answer from viewer=$fromClientId")
-        val answerSdp = SessionDescription(SessionDescription.Type.ANSWER, sdp)
+        if (fromClientId.isBlank()) return
+        val session = peerSessions[fromClientId] ?: return
         session.peerConnection.setRemoteDescription(object : SdpObserver {
             override fun onSetSuccess() {
-                Log.d(TAG, "setRemoteDescription (answer) success viewer=$fromClientId")
                 session.remoteDescriptionSet = true
-                flushPendingRemoteIceCandidates(session)
+                flushPendingIce(session)
             }
-
-            override fun onSetFailure(error: String?) {
-                Log.e(TAG, "setRemoteDescription (answer) failed viewer=$fromClientId: $error")
-            }
-
-            override fun onCreateSuccess(p0: SessionDescription?) {}
-            override fun onCreateFailure(p0: String?) {}
-        }, answerSdp)
+            override fun onSetFailure(e: String?) { Log.e(TAG, "setRemoteDesc failed: $e") }
+            override fun onCreateSuccess(p: SessionDescription?) {}
+            override fun onCreateFailure(e: String?) {}
+        }, SessionDescription(SessionDescription.Type.ANSWER, sdp))
     }
 
     private fun onIceCandidate(fromClientId: String, candidate: JSONObject) {
-        if (fromClientId.isBlank()) {
-            Log.w(TAG, "Received ICE without from client id")
-            return
-        }
-        val session = peerSessions[fromClientId] ?: run {
-            Log.w(TAG, "No session for ICE from viewer=$fromClientId")
-            return
-        }
-        val iceCandidate = IceCandidate(
+        if (fromClientId.isBlank()) return
+        val session = peerSessions[fromClientId] ?: return
+        val ice = IceCandidate(
             candidate.getString("sdpMid"),
             candidate.getInt("sdpMLineIndex"),
-            candidate.getString("candidate")
+            candidate.getString("candidate"),
         )
         if (!session.remoteDescriptionSet) {
-            session.pendingRemoteIceCandidates.add(iceCandidate)
-            Log.d(TAG, "Queued remote ICE candidate viewer=$fromClientId")
-            return
+            session.pendingRemoteIceCandidates.add(ice)
+        } else {
+            session.peerConnection.addIceCandidate(ice)
         }
-        session.peerConnection.addIceCandidate(iceCandidate)
-        Log.d(TAG, "Added remote ICE candidate viewer=$fromClientId")
     }
 
-    private fun flushPendingRemoteIceCandidates(session: PeerSession) {
+    private fun flushPendingIce(session: PeerSession) {
         if (!session.remoteDescriptionSet) return
         while (session.pendingRemoteIceCandidates.isNotEmpty()) {
-            val candidate = session.pendingRemoteIceCandidates.removeFirst()
-            session.peerConnection.addIceCandidate(candidate)
-            Log.d(TAG, "Added queued remote ICE candidate viewer=${session.viewerId}")
+            session.peerConnection.addIceCandidate(session.pendingRemoteIceCandidates.removeFirst())
         }
     }
+
+    // ── #5 Cry detection signal ───────────────────────────────────────────────
+
+    private fun sendCryDetectedSignal() {
+        try {
+            signalingClient?.send(JSONObject().apply {
+                put("type", "cry_detected")
+                put("room", roomName)
+            }.toString())
+            Log.d(TAG, "cry_detected sent to signaling server")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send cry_detected", e)
+        }
+    }
+
+    // ── #6 H.264 SDP munging ─────────────────────────────────────────────────
+
+    private fun preferH264(sdp: String): String {
+        val lines = sdp.split("\r\n").toMutableList()
+        val h264Types = lines
+            .filter { it.startsWith("a=rtpmap:") && it.contains("H264", ignoreCase = true) }
+            .mapNotNull { Regex("a=rtpmap:(\\d+)").find(it)?.groupValues?.get(1) }
+        if (h264Types.isEmpty()) return sdp
+
+        for (i in lines.indices) {
+            if (lines[i].startsWith("m=video ")) {
+                val parts = lines[i].split(" ").toMutableList()
+                if (parts.size < 4) break
+                val prefix   = parts.take(3)
+                val payloads = parts.drop(3)
+                val h264First = h264Types.filter { it in payloads }
+                val others    = payloads.filter { it !in h264Types }
+                lines[i] = (prefix + h264First + others).joinToString(" ")
+                break
+            }
+        }
+        return lines.joinToString("\r\n")
+    }
+
+    // ── #10 Adaptive bitrate ──────────────────────────────────────────────────
+
+    private fun adjustBitrate() {
+        val session = peerSessions.values.firstOrNull() ?: return
+        session.peerConnection.getStats { report ->
+            var packetsSent = 1L
+            var packetsLost = 0L
+            report.statsMap.values.forEach { stat ->
+                if (stat.type == "remote-inbound-rtp") {
+                    (stat.members["packetsLost"] as? Double)?.let { packetsLost += it.toLong() }
+                }
+                if (stat.type == "outbound-rtp" &&
+                    stat.members["kind"]?.toString() == "video") {
+                    (stat.members["packetsSent"] as? Double)?.let { packetsSent += it.toLong() }
+                }
+            }
+            val lossRate = packetsLost.toFloat() / packetsSent.coerceAtLeast(1)
+            val targetBps = when {
+                lossRate > 0.10f -> 300_000
+                lossRate > 0.05f -> 800_000
+                else             -> 2_000_000
+            }
+            Log.d(TAG, "Adaptive bitrate: lossRate=${"%.2f".format(lossRate*100)}% → ${targetBps/1000} kbps")
+            applyMaxBitrate(targetBps)
+        }
+    }
+
+    private fun applyMaxBitrate(bps: Int) {
+        peerSessions.values.forEach { session ->
+            session.peerConnection.senders.forEach { sender ->
+                if (sender.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
+                    val params = sender.parameters
+                    params.encodings?.forEach { it.maxBitrateBps = bps }
+                    sender.parameters = params
+                }
+            }
+        }
+    }
+
+    // ── Session cleanup ───────────────────────────────────────────────────────
 
     private fun closeViewerSession(viewerId: String) {
         val session = peerSessions.remove(viewerId) ?: return
-        try {
-            session.peerConnection.close()
-        } catch (_: Exception) {
-        }
+        try { session.peerConnection.close() } catch (_: Exception) {}
         session.pendingRemoteIceCandidates.clear()
     }
 
     private fun closeAllPeerSessions() {
-        val viewerIds = peerSessions.keys.toList()
-        viewerIds.forEach { viewerId ->
-            closeViewerSession(viewerId)
-        }
+        peerSessions.keys.toList().forEach(::closeViewerSession)
     }
 
+    // ── Stop stream ───────────────────────────────────────────────────────────
+
     private fun stopStream() {
-        if (!sessionActive) {
-            binding.btnToggle.text = "Start"
-            return
-        }
+        if (!sessionActive) { binding.btnToggle.text = "Start"; return }
         binding.tvStatus.text = "Stopping..."
         userStopped = true
-        reconnectHandler.removeCallbacksAndMessages(null)
-        try {
-            signalingClient?.close()
-        } catch (_: Exception) {
-        }
-        signalingClient = null
 
+        reconnectHandler.removeCallbacksAndMessages(null)
+        pingHandler.removeCallbacks(pingRunnable)
+        bitrateHandler.removeCallbacks(bitrateRunnable)
+
+        // #5 Stop cry detector
+        cryDetector?.stop(); cryDetector = null
+
+        // #8 Stop motion detector
+        motionDetector?.stop(); motionDetector = null
+
+        try { signalingClient?.close() } catch (_: Exception) {}
+        signalingClient = null
         closeAllPeerSessions()
         localClientId = ""
 
-        try {
-            videoCapturer?.stopCapture()
-        } catch (_: Exception) {
-        }
-        try {
-            videoCapturer?.dispose()
-        } catch (_: Exception) {
-        }
+        try { videoCapturer?.stopCapture() } catch (_: Exception) {}
+        try { videoCapturer?.dispose() }    catch (_: Exception) {}
         videoCapturer = null
 
-        try {
-            localVideoTrack?.dispose()
-        } catch (_: Exception) {
-        }
-        try {
-            localAudioTrack?.dispose()
-        } catch (_: Exception) {
-        }
+        try { localVideoTrack?.dispose() } catch (_: Exception) {}
+        try { localAudioTrack?.dispose() } catch (_: Exception) {}
         localVideoTrack = null
         localAudioTrack = null
+
         binding.btnMute.isEnabled = false
         binding.btnMute.text = "Mute"
 
-        try {
-            binding.localView.release()
-        } catch (_: Exception) {
-        }
-
-        try {
-            eglBase?.release()
-        } catch (_: Exception) {
-        }
+        try { binding.localView.release() } catch (_: Exception) {}
+        try { eglBase?.release() }          catch (_: Exception) {}
         eglBase = null
 
-        try {
-            if (::peerConnectionFactory.isInitialized) {
-                peerConnectionFactory.dispose()
-            }
-        } catch (_: Exception) {
-        }
+        try { if (::peerConnectionFactory.isInitialized) peerConnectionFactory.dispose() } catch (_: Exception) {}
 
-        // Stop foreground service
-        if (serviceBound) {
-            unbindService(serviceConnection)
-            serviceBound = false
-        }
+        if (serviceBound) { unbindService(serviceConnection); serviceBound = false }
         stopService(Intent(this, StreamingForegroundService::class.java))
 
         binding.tvStatus.text = "Status: Stopped"
@@ -703,8 +744,6 @@ class WebRTCStreamActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (sessionActive) {
-            stopStream()
-        }
+        if (sessionActive) stopStream()
     }
 }

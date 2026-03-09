@@ -27,7 +27,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- Glass settings card -->
+        <!-- ── CONNECTION CARD ──────────────────────────────────────────── -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/card_settings"
             android:layout_width="0dp"
@@ -89,6 +89,26 @@
 
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <!-- Room name (#15) -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/text_input_room"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    style="@style/Widget.IpCamera.TextInput"
+                    app:helperText="Room name (default: baby)"
+                    app:helperTextTextColor="@color/ios_text_secondary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_text_room"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Room Name"
+                        android:inputType="textNoSuggestions"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
                 <!-- Divider -->
                 <View
                     android:layout_width="match_parent"
@@ -97,7 +117,7 @@
                     android:layout_marginTop="20dp"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Camera label -->
+                <!-- CAMERA label -->
                 <com.google.android.material.textview.MaterialTextView
                     android:id="@+id/tv_camera"
                     android:layout_width="wrap_content"
@@ -139,7 +159,7 @@
 
                 </com.google.android.material.button.MaterialButtonToggleGroup>
 
-                <!-- Quality label -->
+                <!-- QUALITY label -->
                 <com.google.android.material.textview.MaterialTextView
                     android:id="@+id/tv_quality"
                     android:layout_width="wrap_content"
@@ -210,6 +230,194 @@
                     android:textColor="@color/ios_text"
                     android:textSize="15sp" />
 
+                <!-- Night mode switch (#6) -->
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_night_mode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Night mode (15 fps, low-light optimised)"
+                    android:textColor="@color/ios_text"
+                    android:textSize="15sp" />
+
+                <!-- Cry detection switch (#5) -->
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_cry_detect"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Enable cry detection"
+                    android:textColor="@color/ios_text"
+                    android:textSize="15sp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ── NOTIFICATIONS CARD (#8 ntfy) ─────────────────────────────── -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tv_notify_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="MOTION ALERTS"
+            android:textColor="@color/ios_text_secondary"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.06"
+            android:layout_marginTop="28dp"
+            android:layout_marginStart="28dp"
+            app:layout_constraintTop_toBottomOf="@id/card_settings"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_notify"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginTop="8dp"
+            app:cardBackgroundColor="@color/glass_white"
+            app:cardCornerRadius="@dimen/card_radius"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/glass_white_border"
+            app:strokeWidth="1dp"
+            app:layout_constraintTop_toBottomOf="@id/tv_notify_header"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/text_input_ntfy_topic"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.IpCamera.TextInput"
+                    app:helperText="ntfy topic (e.g. babycam-xk83js) — install ntfy app on iPhone"
+                    app:helperTextTextColor="@color/ios_text_secondary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_text_ntfy_topic"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="ntfy Topic"
+                        android:inputType="textNoSuggestions"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/text_input_ntfy_base_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    style="@style/Widget.IpCamera.TextInput"
+                    app:helperText="Leave empty to use ntfy.sh (or self-hosted URL)"
+                    app:helperTextTextColor="@color/ios_text_secondary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_text_ntfy_base_url"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="ntfy Base URL (optional)"
+                        android:inputType="textUri"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ── TURN CARD (#9) ────────────────────────────────────────────── -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tv_turn_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TURN SERVER (OPTIONAL)"
+            android:textColor="@color/ios_text_secondary"
+            android:textSize="12sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.06"
+            android:layout_marginTop="28dp"
+            android:layout_marginStart="28dp"
+            app:layout_constraintTop_toBottomOf="@id/card_notify"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_turn"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginTop="8dp"
+            app:cardBackgroundColor="@color/glass_white"
+            app:cardCornerRadius="@dimen/card_radius"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/glass_white_border"
+            app:strokeWidth="1dp"
+            app:layout_constraintTop_toBottomOf="@id/tv_turn_header"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/text_input_turn_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.IpCamera.TextInput"
+                    app:helperText="e.g. turn:my-turn.example.com:3478"
+                    app:helperTextTextColor="@color/ios_text_secondary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_text_turn_url"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="TURN URL"
+                        android:inputType="textUri"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/text_input_turn_user"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    style="@style/Widget.IpCamera.TextInput">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_text_turn_user"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="TURN Username"
+                        android:inputType="textNoSuggestions"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/text_input_turn_cred"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    style="@style/Widget.IpCamera.TextInput"
+                    app:endIconMode="password_toggle">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edit_text_turn_cred"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="TURN Credential"
+                        android:inputType="textPassword"
+                        android:textSize="16sp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -225,7 +433,7 @@
             android:textColor="@color/white"
             android:backgroundTint="@color/ios_blue"
             app:cornerRadius="@dimen/btn_radius"
-            app:layout_constraintTop_toBottomOf="@id/card_settings"
+            app:layout_constraintTop_toBottomOf="@id/card_turn"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
