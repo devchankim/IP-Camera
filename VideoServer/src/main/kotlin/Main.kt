@@ -33,5 +33,6 @@ fun main(args: Array<String>) {
         return
     }
 
+    StaticFileServer(port = 8080).start()
     SignalingWebSocketServer(bindPort = 8081).start()
 }
