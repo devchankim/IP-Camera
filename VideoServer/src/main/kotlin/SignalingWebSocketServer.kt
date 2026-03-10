@@ -216,7 +216,7 @@ class SignalingWebSocketServer(
         val targetId = if (role == "camera") to ?: inferSingleViewerId(room) else room.cameraId
             ?: run { sendError(conn, "Missing target peer"); return }
 
-        val peer = if (role == "camera") room.viewers[targetId] else room.camera
+        val peer = (if (role == "camera") room.viewers[targetId] else room.camera)
             ?: run { sendError(conn, "Peer not connected"); return }
 
         val payload = mapper.createObjectNode().apply {
