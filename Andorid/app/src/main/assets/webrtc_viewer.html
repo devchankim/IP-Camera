@@ -280,6 +280,10 @@
             if (remoteVideo.srcObject) remoteVideo.play().catch(() => {});
         });
 
+        tokenInput.addEventListener('focus', () => {
+            if (statusEl.className === 'error') setStatus('Not connected');
+        });
+
         connectBtn.addEventListener('click', async () => {
             const token = tokenInput.value.trim();
             if (!token) { setError('Please enter your token'); return; }
@@ -345,7 +349,11 @@
                             }
                             break;
                         case 'error':
-                            setError(msg.message);
+                            if (msg.message === 'Unauthorized') {
+                                setError('Invalid token. Please check and try again.');
+                            } else {
+                                setError(msg.message);
+                            }
                             disconnect();
                             break;
                     }
@@ -463,7 +471,10 @@
             pendingRemoteIceCandidates = [];
             remoteVideo.srcObject = null;
             exitStreamingMode();
-            setStatus('Disconnected');
+            // Keep error message visible if there was one
+            if (statusEl.className !== 'error') {
+                setStatus('Disconnected');
+            }
             settingsPanel.classList.remove('hidden');
             connectBtn.disabled = false;
         }
