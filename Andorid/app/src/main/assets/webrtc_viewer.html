@@ -350,28 +350,29 @@
                             break;
                         case 'error':
                             if (msg.message === 'Unauthorized') {
+                                // Token wrong — go back to login, no auto-reconnect
                                 setError('Invalid token. Please check and try again.');
+                                disconnect();
                             } else {
-                                setError(msg.message);
+                                // Other server errors — just log, don't disconnect
+                                console.warn('Server error:', msg.message);
                             }
-                            disconnect();
                             break;
                     }
                 };
 
-                signalingWs.onerror = () => { setError('Connection error'); };
+                signalingWs.onerror = () => { console.warn('WebSocket error'); };
                 signalingWs.onclose = () => {
+                    signalingWs = null;
                     if (wsKeepAlive) { clearInterval(wsKeepAlive); wsKeepAlive = null; }
-                    if (statusEl.className !== 'error') {
-                        setStatus('Signaling lost, reconnecting...');
-                        // Auto-reconnect after 2 seconds
-                        if (currentToken) {
-                            setTimeout(() => {
-                                if (!signalingWs && currentToken) {
-                                    connect(signalingServer, currentToken);
-                                }
-                            }, 2000);
-                        }
+                    // Always auto-reconnect unless user explicitly disconnected
+                    if (currentToken) {
+                        setStatus('Reconnecting...');
+                        setTimeout(() => {
+                            if (!signalingWs && currentToken) {
+                                connect(signalingServer, currentToken);
+                            }
+                        }, 2000);
                     }
                 };
             } catch (error) {
@@ -418,10 +419,14 @@
             peerConnection.oniceconnectionstatechange = () => {
                 const state = peerConnection?.iceConnectionState;
                 if (state === 'failed') {
-                    setError('Connection failed');
+                    // ICE failed — close PC, camera will detect and send new offer
+                    console.warn('ICE failed, waiting for new offer...');
+                    setStatus('Reconnecting...');
+                    if (peerConnection) { peerConnection.close(); peerConnection = null; }
+                    remoteDescriptionSet = false;
+                    pendingRemoteIceCandidates = [];
                 } else if (state === 'disconnected') {
-                    setStatus('Reconnecting...', 'normal');
-                    // Don't immediately error — WebRTC may recover
+                    setStatus('Reconnecting...');
                 }
             };
         }
