@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/black"
+    android:background="@android:color/white"
     tools:context=".WebRTCStreamActivity">
 
-    <!-- Full-screen camera preview -->
     <org.webrtc.SurfaceViewRenderer
         android:id="@+id/local_view"
         android:layout_width="0dp"
@@ -18,80 +16,77 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Top gradient scrim -->
-    <View
-        android:layout_width="0dp"
-        android:layout_height="120dp"
-        android:background="@drawable/scrim_top"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- Top row: Back + Status -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_back"
-        style="@style/Widget.IpCamera.Button.Glass"
         android:layout_width="wrap_content"
-        android:layout_height="44dp"
+        android:layout_height="wrap_content"
         android:text="Back"
-        android:textSize="15sp"
-        app:cornerRadius="22dp"
+        android:textColor="@android:color/white"
+        android:backgroundTint="#66000000"
+        app:cornerRadius="10dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp" />
+        android:layout_margin="16dp"
+        />
 
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/tv_status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        style="@style/MaterialAlertDialog.Material3.Body.Text"
         android:text="Status: Disconnected"
-        android:textColor="@color/white"
-        android:textSize="13sp"
-        android:fontFamily="sans-serif-medium"
-        android:background="@drawable/bg_status_chip"
-        android:paddingHorizontal="14dp"
+        android:textColor="@android:color/white"
+        android:background="#66000000"
+        android:paddingHorizontal="12dp"
         android:paddingVertical="8dp"
+        android:layout_margin="16dp"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/btn_back"
-        app:layout_constraintStart_toStartOf="parent"
+        />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tv_server_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        style="@style/MaterialAlertDialog.Material3.Body.Text"
+        android:text=""
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:background="#99007AFF"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
         android:layout_marginStart="16dp"
-        android:layout_marginTop="8dp" />
-
-    <!-- Bottom gradient scrim -->
-    <View
-        android:layout_width="0dp"
-        android:layout_height="140dp"
-        android:background="@drawable/scrim_bottom"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_marginTop="4dp"
+        android:visibility="gone"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/tv_status"
+        />
 
-    <!-- Bottom controls -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_toggle"
-        style="@style/Widget.IpCamera.Button.Glass"
         android:layout_width="wrap_content"
-        android:layout_height="52dp"
+        android:layout_height="wrap_content"
         android:text="Start"
-        android:textSize="16sp"
-        android:backgroundTint="@color/ios_blue"
-        app:cornerRadius="26dp"
+        android:textColor="@android:color/white"
+        android:backgroundTint="#007AFF"
+        app:cornerRadius="8dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
-        android:layout_marginStart="16dp"
-        android:layout_marginBottom="32dp" />
+        android:layout_margin="16dp"
+        />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_mute"
-        style="@style/Widget.IpCamera.Button.Glass"
         android:layout_width="wrap_content"
-        android:layout_height="52dp"
+        android:layout_height="wrap_content"
         android:text="Mute"
-        android:textSize="16sp"
-        app:cornerRadius="26dp"
+        android:textColor="@android:color/white"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        app:strokeColor="@android:color/white"
+        app:cornerRadius="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="32dp" />
+        android:layout_margin="16dp"
+        />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

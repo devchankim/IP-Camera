@@ -39,7 +39,7 @@ class MainFragment : Fragment() {
 
         binding.buttonStream.setOnClickListener {
             if (CameraPermissionActivity.hasPermission(requireContext())) {
-                if (prefs.getIpAddress() == null) {
+                if (prefs.getSignalingToken().isNullOrEmpty()) {
                     parentFragmentManager
                         .beginTransaction()
                         .replace(R.id.fragment_container, SettingsFragment(), "SettingsFragment")
@@ -48,7 +48,7 @@ class MainFragment : Fragment() {
 
                     Toast.makeText(
                         requireContext(),
-                        "Server IP address is required",
+                        "Signaling token is required",
                         Toast.LENGTH_LONG
                     ).show()
                 } else {

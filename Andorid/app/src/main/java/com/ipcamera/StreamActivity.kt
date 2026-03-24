@@ -78,7 +78,8 @@ class StreamActivity : AppCompatActivity() {
 
         surfaceView.holder.setFixedSize(1920, 1080)
 
-        val ipAddress = SettingsPreferences(this.applicationContext).getIpAddress()!!
+        // Legacy TCP stream — no longer used (WebRTC self-hosted mode replaced this)
+        val ipAddress = "127.0.0.1:4321"
 
         binding.btnSave.setOnClickListener {
             if (isStreaming) {
