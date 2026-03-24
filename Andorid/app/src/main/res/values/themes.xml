@@ -8,73 +8,98 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
 
-        <!-- iOS 26 Blue -->
-        <item name="colorPrimary">@color/ios_blue</item>
-        <item name="colorPrimaryVariant">@color/ios_blue_dark</item>
-        <item name="colorOnPrimary">@color/white</item>
+        <!-- shadcn/ui primary = near black -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/foreground</item>
+        <item name="colorOnPrimary">@color/primary_foreground</item>
 
-        <!-- Surface: glass white -->
-        <item name="colorSurface">@color/glass_white</item>
-        <item name="colorOnSurface">@color/ios_text</item>
+        <!-- Surface -->
+        <item name="colorSurface">@color/card</item>
+        <item name="colorOnSurface">@color/foreground</item>
 
-        <!-- Background: gradient base -->
-        <item name="android:colorBackground">@color/bg_base</item>
+        <!-- Background -->
+        <item name="android:colorBackground">@color/background</item>
 
-        <!-- Button style: pill -->
-        <item name="materialButtonStyle">@style/Widget.IpCamera.Button.Pill</item>
+        <!-- Button style -->
+        <item name="materialButtonStyle">@style/Widget.Shadcn.Button</item>
 
-        <!-- TextInputLayout: rounded glass -->
-        <item name="textInputStyle">@style/Widget.IpCamera.TextInput</item>
+        <!-- TextInputLayout -->
+        <item name="textInputStyle">@style/Widget.Shadcn.TextInput</item>
     </style>
 
-    <!-- Pill Button (primary filled) -->
-    <style name="Widget.IpCamera.Button.Pill" parent="Widget.Material3.Button">
-        <item name="cornerRadius">26dp</item>
+    <!-- shadcn/ui Primary Button -->
+    <style name="Widget.Shadcn.Button" parent="Widget.Material3.Button">
+        <item name="cornerRadius">@dimen/radius_sm</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="android:paddingStart">24dp</item>
-        <item name="android:paddingEnd">24dp</item>
-        <item name="android:minHeight">52dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="backgroundTint">@color/primary</item>
+        <item name="android:textColor">@color/primary_foreground</item>
     </style>
 
-    <!-- Outlined pill button (secondary) -->
-    <style name="Widget.IpCamera.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="cornerRadius">26dp</item>
+    <!-- shadcn/ui Outline Button -->
+    <style name="Widget.Shadcn.Button.Outline" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="cornerRadius">@dimen/radius_sm</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="android:paddingStart">24dp</item>
-        <item name="android:paddingEnd">24dp</item>
-        <item name="android:minHeight">52dp</item>
-        <item name="strokeColor">@color/glass_white_border</item>
-        <item name="android:textColor">@color/ios_text</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="strokeColor">@color/border</item>
+        <item name="android:textColor">@color/foreground</item>
     </style>
 
-    <!-- Glass overlay button (dark, for use on video) -->
-    <style name="Widget.IpCamera.Button.Glass" parent="Widget.Material3.Button">
-        <item name="cornerRadius">26dp</item>
+    <!-- shadcn/ui Secondary Button -->
+    <style name="Widget.Shadcn.Button.Secondary" parent="Widget.Material3.Button">
+        <item name="cornerRadius">@dimen/radius_sm</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="android:paddingStart">20dp</item>
-        <item name="android:paddingEnd">20dp</item>
-        <item name="android:minHeight">44dp</item>
-        <item name="backgroundTint">@color/glass_dark_btn</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="backgroundTint">@color/secondary</item>
+        <item name="android:textColor">@color/secondary_foreground</item>
+    </style>
+
+    <!-- shadcn/ui Ghost Button (for overlay on video) -->
+    <style name="Widget.Shadcn.Button.Ghost" parent="Widget.Material3.Button">
+        <item name="cornerRadius">@dimen/radius_sm</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:minHeight">36dp</item>
+        <item name="backgroundTint">@color/overlay_dark</item>
         <item name="android:textColor">@color/white</item>
-        <item name="strokeColor">@color/glass_white_border</item>
-        <item name="strokeWidth">1dp</item>
     </style>
 
-    <!-- Rounded TextInputLayout -->
-    <style name="Widget.IpCamera.TextInput" parent="Widget.Material3.TextInputLayout.OutlinedBox">
-        <item name="boxCornerRadiusTopStart">16dp</item>
-        <item name="boxCornerRadiusTopEnd">16dp</item>
-        <item name="boxCornerRadiusBottomStart">16dp</item>
-        <item name="boxCornerRadiusBottomEnd">16dp</item>
-        <item name="boxStrokeColor">@color/glass_white_border</item>
-        <item name="boxBackgroundColor">@color/glass_white</item>
-        <item name="helperTextTextColor">@color/ios_text_secondary</item>
+    <!-- shadcn/ui TextInput -->
+    <style name="Widget.Shadcn.TextInput" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">@dimen/radius_sm</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/radius_sm</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/radius_sm</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/radius_sm</item>
+        <item name="boxStrokeColor">@color/input</item>
+        <item name="boxBackgroundColor">@color/background</item>
+        <item name="helperTextTextColor">@color/muted_foreground</item>
+    </style>
+
+    <!-- shadcn/ui Toggle Button -->
+    <style name="Widget.Shadcn.ToggleButton" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="cornerRadius">@dimen/radius_sm</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:minHeight">36dp</item>
+        <item name="strokeColor">@color/border</item>
+        <item name="android:textColor">@color/foreground</item>
+        <item name="android:textSize">13sp</item>
     </style>
 
 </resources>

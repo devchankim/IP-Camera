@@ -26,7 +26,8 @@
         <activity
             android:name=".WebRTCStreamActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             />
 
         <activity

@@ -7,27 +7,31 @@ import org.java_websocket.server.WebSocketServer
 import org.json.JSONObject
 import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Embedded WebRTC signaling server that runs directly on the Android device.
+ * Embedded WebRTC signaling server — supports 1 camera + N viewers per room.
  *
- * Ported from VideoServer/SignalingWebSocketServer.kt with Jackson replaced by org.json.
- * Protocol is identical: join/offer/answer/ice with token auth and one-camera-one-viewer rooms.
+ * Each client gets a unique clientId on join. Messages are routed via "to" field.
+ * Camera creates a separate PeerConnection (offer/answer/ICE) for each viewer.
  */
 class EmbeddedSignalingServer(
     private val port: Int = 8081,
     private val requiredToken: String,
 ) {
     private val TAG = "EmbeddedSignaling"
+    private val clientIdCounter = AtomicInteger(0)
 
     private data class ClientState(
+        val clientId: String,
         var room: String? = null,
         var role: String? = null,
     )
 
     private data class RoomState(
         @Volatile var camera: WebSocket? = null,
-        @Volatile var viewer: WebSocket? = null,
+        @Volatile var cameraClientId: String? = null,
+        val viewers: ConcurrentHashMap<String, WebSocket> = ConcurrentHashMap(), // clientId → WS
     )
 
     private val clients = ConcurrentHashMap<WebSocket, ClientState>()
@@ -35,31 +39,54 @@ class EmbeddedSignalingServer(
 
     private val server = object : WebSocketServer(InetSocketAddress(port)) {
         override fun onOpen(conn: WebSocket, handshake: ClientHandshake) {
-            clients[conn] = ClientState()
-            Log.d(TAG, "Connection opened: ${conn.remoteSocketAddress}")
+            val clientId = "c${clientIdCounter.incrementAndGet()}"
+            clients[conn] = ClientState(clientId)
+            Log.d(TAG, "Connection opened: $clientId ${conn.remoteSocketAddress}")
         }
 
         override fun onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean) {
-            val state = clients.remove(conn)
-            if (state?.room != null && state.role != null) {
-                val roomId = state.room!!
-                val room = rooms[roomId]
-                if (room != null) {
-                    val role = state.role!!
-                    val peer = if (role == "camera") room.viewer else room.camera
-                    if (role == "camera" && room.camera == conn) room.camera = null
-                    if (role == "viewer" && room.viewer == conn) room.viewer = null
-                    peer?.send(JSONObject().apply {
-                        put("type", "peer_left")
-                        put("room", roomId)
-                        put("role", role)
-                    }.toString())
-                    Log.d(TAG, "$role left room=$roomId")
+            val state = clients.remove(conn) ?: return
+            val roomId = state.room ?: return
+            val room = rooms[roomId] ?: return
+            val role = state.role ?: return
 
-                    if (room.camera == null && room.viewer == null) {
-                        rooms.remove(roomId)
+            when (role) {
+                "camera" -> {
+                    if (room.camera == conn) {
+                        room.camera = null
+                        room.cameraClientId = null
+                    }
+                    // Notify all viewers that camera left
+                    for ((vid, vws) in room.viewers) {
+                        try {
+                            vws.send(JSONObject().apply {
+                                put("type", "peer_left")
+                                put("room", roomId)
+                                put("role", "camera")
+                            }.toString())
+                        } catch (_: Exception) {}
                     }
                 }
+                "viewer" -> {
+                    room.viewers.remove(state.clientId)
+                    // Notify camera that this viewer left
+                    room.camera?.let { cam ->
+                        try {
+                            cam.send(JSONObject().apply {
+                                put("type", "peer_left")
+                                put("room", roomId)
+                                put("role", "viewer")
+                                put("clientId", state.clientId)
+                            }.toString())
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+
+            Log.d(TAG, "${role} ${state.clientId} left room=$roomId")
+
+            if (room.camera == null && room.viewers.isEmpty()) {
+                rooms.remove(roomId)
             }
         }
 
@@ -129,75 +156,112 @@ class EmbeddedSignalingServer(
         }
 
         val room = rooms.computeIfAbsent(roomId) { RoomState() }
+        val state = clients[conn] ?: return
+        state.room = roomId
+        state.role = role
 
-        val prev = clients[conn] ?: ClientState().also { clients[conn] = it }
-        prev.room = roomId
-        prev.role = role
+        when (role) {
+            "camera" -> {
+                // Replace old camera if any
+                val oldCam = room.camera
+                room.camera = conn
+                room.cameraClientId = state.clientId
+                if (oldCam != null && oldCam != conn) {
+                    sendError(oldCam, "Replaced by a new camera connection")
+                    oldCam.close()
+                }
 
-        // Enforce one-per-role
-        val replaced: WebSocket? = when (role) {
-            "camera" -> { val old = room.camera; room.camera = conn; old }
-            else -> { val old = room.viewer; room.viewer = conn; old }
+                // Send joined to camera
+                conn.send(JSONObject().apply {
+                    put("type", "joined")
+                    put("room", roomId)
+                    put("role", role)
+                    put("clientId", state.clientId)
+                }.toString())
+
+                // Notify camera about all existing viewers
+                for ((vid, _) in room.viewers) {
+                    conn.send(JSONObject().apply {
+                        put("type", "peer_joined")
+                        put("room", roomId)
+                        put("role", "viewer")
+                        put("clientId", vid)
+                    }.toString())
+                }
+            }
+            "viewer" -> {
+                // Add to viewers map (no replacement — multiple viewers allowed)
+                room.viewers[state.clientId] = conn
+
+                // Send joined to viewer with their clientId
+                conn.send(JSONObject().apply {
+                    put("type", "joined")
+                    put("room", roomId)
+                    put("role", role)
+                    put("clientId", state.clientId)
+                }.toString())
+
+                // If camera exists, notify both sides
+                if (room.camera != null) {
+                    // Tell camera a new viewer joined
+                    room.camera!!.send(JSONObject().apply {
+                        put("type", "peer_joined")
+                        put("room", roomId)
+                        put("role", "viewer")
+                        put("clientId", state.clientId)
+                    }.toString())
+
+                    // Tell viewer the camera is here
+                    conn.send(JSONObject().apply {
+                        put("type", "peer_joined")
+                        put("room", roomId)
+                        put("role", "camera")
+                        put("clientId", room.cameraClientId)
+                    }.toString())
+                }
+            }
         }
-        if (replaced != null && replaced != conn) {
-            sendError(replaced, "Replaced by a new $role connection")
-            replaced.close()
-        }
 
-        conn.send(JSONObject().apply {
-            put("type", "joined")
-            put("room", roomId)
-            put("role", role)
-        }.toString())
-
-        val peer = if (role == "camera") room.viewer else room.camera
-        if (peer != null) {
-            peer.send(JSONObject().apply {
-                put("type", "peer_joined")
-                put("room", roomId)
-                put("role", role)
-            }.toString())
-            conn.send(JSONObject().apply {
-                put("type", "peer_joined")
-                put("room", roomId)
-                put("role", if (role == "camera") "viewer" else "camera")
-            }.toString())
-        }
-
-        Log.d(TAG, "Joined room=$roomId role=$role")
+        Log.d(TAG, "Joined room=$roomId role=$role clientId=${state.clientId}")
     }
 
     private fun relayToPeer(conn: WebSocket, type: String, json: JSONObject) {
-        val state = clients[conn]
-        val roomId = state?.room
-        val role = state?.role
-        if (roomId == null || role == null) {
-            sendError(conn, "Not joined")
-            return
-        }
+        val state = clients[conn] ?: run { sendError(conn, "Not joined"); return }
+        val roomId = state.room ?: run { sendError(conn, "Not joined"); return }
+        val room = rooms[roomId] ?: run { sendError(conn, "Unknown room"); return }
 
-        val room = rooms[roomId] ?: run {
-            sendError(conn, "Unknown room")
-            return
-        }
-
-        val peer = if (role == "camera") room.viewer else room.camera
-        if (peer == null) {
-            sendError(conn, "Peer not connected")
-            return
-        }
+        val targetId = json.optString("to", "")
 
         val payload = JSONObject().apply {
             put("type", type)
             put("room", roomId)
-            put("from", role)
+            put("from", state.clientId)
             when (type) {
                 "offer", "answer" -> put("sdp", json.optString("sdp", ""))
                 "ice" -> put("candidate", json.optJSONObject("candidate"))
             }
         }
 
-        peer.send(payload.toString())
+        when (state.role) {
+            "camera" -> {
+                // Camera → specific viewer (by clientId in "to" field)
+                val viewerWs = if (targetId.isNotEmpty()) room.viewers[targetId] else null
+                if (viewerWs != null) {
+                    viewerWs.send(payload.toString())
+                } else {
+                    sendError(conn, "Viewer not found: $targetId")
+                }
+            }
+            "viewer" -> {
+                // Viewer → camera
+                val cam = room.camera
+                if (cam != null) {
+                    cam.send(payload.toString())
+                } else {
+                    sendError(conn, "Camera not connected")
+                }
+            }
+        }
     }
 
     private fun sendError(conn: WebSocket, message: String) {

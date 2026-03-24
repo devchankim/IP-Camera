@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
+    android:background="#09090B"
     tools:context=".WebRTCStreamActivity">
 
     <org.webrtc.SurfaceViewRenderer
@@ -16,77 +16,111 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_back"
-        android:layout_width="wrap_content"
+    <!-- Top bar: status -->
+    <LinearLayout
+        android:id="@+id/top_bar"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Back"
-        android:textColor="@android:color/white"
-        android:backgroundTint="#66000000"
-        app:cornerRadius="10dp"
-        app:layout_constraintStart_toStartOf="parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="@drawable/scrim_top"
         app:layout_constraintTop_toTopOf="parent"
-        android:layout_margin="16dp"
-        />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
-    <com.google.android.material.textview.MaterialTextView
-        android:id="@+id/tv_status"
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Disconnected"
+            android:textSize="12sp"
+            android:textColor="#A1A1AA"
+            android:fontFamily="monospace"
+            android:background="#CC18181B"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="5dp" />
+
+        <TextView
+            android:id="@+id/tv_server_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#FAFAFA"
+            android:textSize="13sp"
+            android:fontFamily="monospace"
+            android:background="#CC18181B"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="5dp"
+            android:layout_marginTop="4dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    <!-- Bottom floating pill control bar -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/control_bar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        style="@style/MaterialAlertDialog.Material3.Body.Text"
-        android:text="Status: Disconnected"
-        android:textColor="@android:color/white"
-        android:background="#66000000"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="8dp"
-        android:layout_margin="16dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btn_back"
-        />
-
-    <com.google.android.material.textview.MaterialTextView
-        android:id="@+id/tv_server_info"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        style="@style/MaterialAlertDialog.Material3.Body.Text"
-        android:text=""
-        android:textColor="#FFFFFF"
-        android:textSize="14sp"
-        android:background="#99007AFF"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="8dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="4dp"
-        android:visibility="gone"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv_status"
-        />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_toggle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Start"
-        android:textColor="@android:color/white"
-        android:backgroundTint="#007AFF"
-        app:cornerRadius="8dp"
-        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginBottom="32dp"
+        app:cardBackgroundColor="#CC18181B"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="8dp"
+        app:strokeWidth="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        android:layout_margin="16dp"
-        />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_mute"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Mute"
-        android:textColor="@android:color/white"
-        style="@style/Widget.Material3.Button.OutlinedButton"
-        app:strokeColor="@android:color/white"
-        app:cornerRadius="8dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        android:layout_margin="16dp"
-        />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_back"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Back"
+                android:textSize="13sp"
+                android:textColor="#71717A"
+                android:textAllCaps="false"
+                android:minWidth="0dp"
+                android:paddingHorizontal="14dp"
+                app:cornerRadius="18dp"
+                app:rippleColor="#1AFFFFFF" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_toggle"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Start"
+                android:textSize="14sp"
+                android:textColor="#FAFAFA"
+                android:textAllCaps="false"
+                android:textStyle="bold"
+                android:minWidth="0dp"
+                android:paddingHorizontal="20dp"
+                app:cornerRadius="18dp"
+                app:rippleColor="#1AFFFFFF" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_mute"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Mute"
+                android:textSize="13sp"
+                android:textColor="#71717A"
+                android:textAllCaps="false"
+                android:minWidth="0dp"
+                android:paddingHorizontal="14dp"
+                app:cornerRadius="18dp"
+                app:rippleColor="#1AFFFFFF" />
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -2,7 +2,7 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
+    android:background="@color/background"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <TextView
@@ -10,14 +10,14 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Settings"
-        android:textSize="28sp"
-        android:textColor="#1D1D1F"
-        android:fontFamily="sans-serif-medium"
+        android:textSize="20sp"
+        android:textColor="@color/foreground"
+        android:fontFamily="sans-serif-bold"
+        android:letterSpacing="-0.02"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        android:layout_marginTop="60dp"
-        />
+        android:layout_marginTop="60dp" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/text_input_token"
@@ -25,16 +25,11 @@
         android:layout_height="wrap_content"
         app:layout_constraintTop_toBottomOf="@id/tv_settings"
         app:helperText="Viewers must enter this token to connect"
-        app:helperTextTextColor="#86868B"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="20dp"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-        app:boxCornerRadiusTopStart="8dp"
-        app:boxCornerRadiusTopEnd="8dp"
-        app:boxCornerRadiusBottomStart="8dp"
-        app:boxCornerRadiusBottomEnd="8dp"
-        app:endIconMode="password_toggle"
-        >
+        app:helperTextTextColor="@color/muted_foreground"
+        android:layout_marginHorizontal="@dimen/screen_padding"
+        android:layout_marginTop="32dp"
+        style="@style/Widget.Shadcn.TextInput"
+        app:endIconMode="password_toggle">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/edit_text_token"
@@ -42,8 +37,7 @@
             android:layout_height="wrap_content"
             android:hint="Signaling Token"
             android:inputType="textPassword"
-            android:textSize="16sp"
-            />
+            android:textSize="14sp" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -52,21 +46,20 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Camera"
-        android:textColor="#1D1D1F"
-        android:textSize="14sp"
+        android:textColor="@color/foreground"
+        android:textSize="13sp"
         android:fontFamily="sans-serif-medium"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="24dp"
+        android:layout_marginHorizontal="@dimen/screen_padding"
+        android:layout_marginTop="@dimen/spacing_lg"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/text_input_token"
-        />
+        app:layout_constraintTop_toBottomOf="@id/text_input_token" />
 
     <com.google.android.material.button.MaterialButtonToggleGroup
         android:id="@+id/toggle_camera_facing"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginHorizontal="@dimen/screen_padding"
+        android:layout_marginTop="@dimen/spacing_sm"
         app:singleSelection="true"
         app:selectionRequired="true"
         app:layout_constraintTop_toBottomOf="@id/tv_camera"
@@ -75,100 +68,30 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_camera_back"
-            style="@style/Widget.Material3.Button.OutlinedButton"
+            style="@style/Widget.Shadcn.ToggleButton"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="40dp"
             android:layout_weight="1"
-            android:text="Rear"
-            />
+            android:text="Rear" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_camera_front"
-            style="@style/Widget.Material3.Button.OutlinedButton"
+            style="@style/Widget.Shadcn.ToggleButton"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="40dp"
             android:layout_weight="1"
-            android:text="Front"
-            />
+            android:text="Front" />
     </com.google.android.material.button.MaterialButtonToggleGroup>
-
-    <TextView
-        android:id="@+id/tv_quality"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Quality"
-        android:textColor="#1D1D1F"
-        android:textSize="14sp"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="18dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/toggle_camera_facing"
-        />
-
-    <com.google.android.material.button.MaterialButtonToggleGroup
-        android:id="@+id/toggle_quality"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="10dp"
-        app:singleSelection="true"
-        app:selectionRequired="true"
-        app:layout_constraintTop_toBottomOf="@id/tv_quality"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_quality_low"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="Low"
-            />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_quality_medium"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="Standard"
-            />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_quality_high"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="High"
-            />
-    </com.google.android.material.button.MaterialButtonToggleGroup>
-
-    <com.google.android.material.materialswitch.MaterialSwitch
-        android:id="@+id/switch_stun"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginTop="18dp"
-        android:text="Allow STUN fallback (uses public STUN)"
-        android:textColor="#1D1D1F"
-        app:layout_constraintTop_toBottomOf="@id/toggle_quality"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_save"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginHorizontal="24dp"
+        android:layout_height="44dp"
+        android:layout_marginHorizontal="@dimen/screen_padding"
         android:layout_marginBottom="40dp"
         android:text="Save"
-        android:textSize="16sp"
-        app:cornerRadius="12dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        />
+        android:textSize="14sp"
+        app:cornerRadius="@dimen/radius_sm"
+        app:layout_constraintBottom_toBottomOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

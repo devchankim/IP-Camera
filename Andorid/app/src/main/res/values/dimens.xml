@@ -1,8 +1,10 @@
 <resources>
-    <dimen name="fab_margin">16dp</dimen>
-    <dimen name="horizontal_margin">20dp</dimen>
-    <dimen name="card_radius">24dp</dimen>
-    <dimen name="btn_radius">26dp</dimen>
-    <dimen name="input_radius">16dp</dimen>
-    <dimen name="screen_padding">20dp</dimen>
+    <!-- shadcn/ui spacing and radius -->
+    <dimen name="radius">10dp</dimen>
+    <dimen name="radius_sm">6dp</dimen>
+    <dimen name="radius_lg">12dp</dimen>
+    <dimen name="spacing">16dp</dimen>
+    <dimen name="spacing_sm">8dp</dimen>
+    <dimen name="spacing_lg">24dp</dimen>
+    <dimen name="screen_padding">24dp</dimen>
 </resources>
