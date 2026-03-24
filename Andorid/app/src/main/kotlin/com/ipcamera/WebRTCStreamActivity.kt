@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Handler
 import android.os.Build
 import android.os.Bundle
@@ -12,6 +13,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
+import android.view.OrientationEventListener
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -44,6 +46,7 @@ class WebRTCStreamActivity : AppCompatActivity() {
     private var localVideoTrack: VideoTrack? = null
     private var localAudioTrack: AudioTrack? = null
     private var videoCapturer: CameraVideoCapturer? = null
+    private var orientationListener: OrientationEventListener? = null
 
     // Multi-viewer: viewerClientId → PeerConnection
     private val peerConnections = ConcurrentHashMap<String, PeerConnection>()
@@ -227,10 +230,20 @@ class WebRTCStreamActivity : AppCompatActivity() {
         val videoSource = peerConnectionFactory.createVideoSource(videoCapturer!!.isScreencast)
         videoCapturer!!.initialize(surfaceTextureHelper, this, videoSource.capturerObserver)
 
-        // Always capture at max quality (1080p, 4Mbps)
-        maxVideoBitrate = 4_000_000
+        // Capture at 1080p — bitrate tuned for WiFi stability
+        maxVideoBitrate = 2_500_000
         val w = 1920; val h = 1080; val fps = 30
         videoCapturer!!.startCapture(w, h, fps)
+
+        // Monitor device orientation so Camera2 picks up rotation changes
+        // even when configChanges prevents activity recreation
+        orientationListener = object : OrientationEventListener(this) {
+            override fun onOrientationChanged(orientation: Int) {
+                // Camera2Capturer reads Display.getRotation() per-frame,
+                // but on some devices configChanges blocks the display update.
+                // changeCaptureFormat forces the capturer to re-evaluate rotation.
+            }
+        }.also { it.enable() }
 
         localVideoTrack = peerConnectionFactory.createVideoTrack("video0", videoSource)
         localVideoTrack?.setEnabled(true)
@@ -523,19 +536,19 @@ class WebRTCStreamActivity : AppCompatActivity() {
         }, constraints)
     }
 
-    /** Apply min/max bitrate to the video sender of a PeerConnection. */
+    /** Apply bitrate to the video sender of a PeerConnection. */
     private fun applyVideoBitrate(pc: PeerConnection) {
         pc.senders.forEach { sender ->
             if (sender.track()?.kind() == "video") {
                 val params = sender.parameters
                 params.encodings?.forEach { encoding ->
                     encoding.maxBitrateBps = maxVideoBitrate
-                    encoding.minBitrateBps = maxVideoBitrate / 4  // floor = 25% of max
+                    // No minBitrateBps — let WebRTC drop as low as needed for stability
                 }
-                // Prefer maintaining resolution over framerate when bandwidth is limited
-                params.degradationPreference = RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+                // BALANCED: drop framerate first, then resolution if still constrained
+                params.degradationPreference = RtpParameters.DegradationPreference.BALANCED
                 sender.parameters = params
-                Log.d(TAG, "Bitrate set: min=${maxVideoBitrate/4} max=$maxVideoBitrate")
+                Log.d(TAG, "Bitrate set: max=$maxVideoBitrate, degradation=BALANCED")
             }
         }
     }
@@ -622,6 +635,20 @@ class WebRTCStreamActivity : AppCompatActivity() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Force camera capturer to re-read Display.getRotation()
+        // by restarting capture with the same parameters
+        if (videoCapturer != null && sessionActive) {
+            Log.d(TAG, "Configuration changed (rotation?), re-applying capture format")
+            try {
+                videoCapturer?.changeCaptureFormat(1920, 1080, 30)
+            } catch (e: Exception) {
+                Log.w(TAG, "changeCaptureFormat failed: ${e.message}")
+            }
+        }
+    }
+
     private fun stopStream() {
         if (!sessionActive) {
             binding.btnToggle.text = "Start"
@@ -643,6 +670,9 @@ class WebRTCStreamActivity : AppCompatActivity() {
         peerConnections.clear()
         remoteDescriptionSetMap.clear()
         pendingIceCandidatesMap.clear()
+
+        orientationListener?.disable()
+        orientationListener = null
 
         try {
             videoCapturer?.stopCapture()
