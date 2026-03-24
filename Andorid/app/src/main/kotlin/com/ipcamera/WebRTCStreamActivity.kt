@@ -56,7 +56,7 @@ class WebRTCStreamActivity : AppCompatActivity() {
     private val peerSessions = ConcurrentHashMap<String, PeerSession>()
 
     // Signaling
-    private var signalingClient: WebSocketClient? = null
+    @Volatile private var signalingClient: WebSocketClient? = null
     private var roomName = "baby"
     private var signalingToken = ""
     private var signalingServerAddress: String = ""
@@ -279,7 +279,12 @@ class WebRTCStreamActivity : AppCompatActivity() {
 
         val surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", eglBase!!.eglBaseContext)
         val videoSource = peerConnectionFactory.createVideoSource(videoCapturer!!.isScreencast)
-        videoCapturer!!.initialize(surfaceTextureHelper, this, videoSource.capturerObserver)
+        // Night mode: wrap the capturer observer with a luma-boost processor
+        val capturerObserver = if (nightModePref)
+            NightModeProcessor(videoSource.capturerObserver)
+        else
+            videoSource.capturerObserver
+        videoCapturer!!.initialize(surfaceTextureHelper, this, capturerObserver)
 
         // #6 Resolve capture parameters
         val (capW, capH, capFps) = resolveCaptureParams()
@@ -364,8 +369,10 @@ class WebRTCStreamActivity : AppCompatActivity() {
     private fun connectSignaling(serverAddress: String) {
         binding.tvStatus.text = "Connecting to signaling..."
         val uri = URI("ws://$serverAddress")
-        signalingClient = object : WebSocketClient(uri) {
+        val newClient = object : WebSocketClient(uri) {
             override fun onOpen(h: ServerHandshake?) {
+                // Ignore if this client was already replaced
+                if (signalingClient !== this) { try { close() } catch (_: Exception) {}; return }
                 reconnectAttempts = 0
                 runOnUiThread { binding.tvStatus.text = "Signaling: connected, joining room..." }
                 // #2 Start keepalive
@@ -379,6 +386,7 @@ class WebRTCStreamActivity : AppCompatActivity() {
             }
 
             override fun onMessage(message: String?) {
+                if (signalingClient !== this) return
                 message ?: return
                 Log.d(TAG, "Signaling: $message")
                 try {
@@ -401,6 +409,8 @@ class WebRTCStreamActivity : AppCompatActivity() {
             }
 
             override fun onClose(code: Int, reason: String?, remote: Boolean) {
+                // Ignore if this client was already replaced by a newer connection
+                if (signalingClient !== this) return
                 Log.d(TAG, "Signaling closed: $reason")
                 pingHandler.removeCallbacks(pingRunnable)
                 closeAllPeerSessions()
@@ -410,7 +420,12 @@ class WebRTCStreamActivity : AppCompatActivity() {
 
             override fun onError(ex: Exception?) { Log.e(TAG, "Signaling error", ex) }
         }
-        signalingClient?.connect()
+        // Replace old client first (so its callbacks see signalingClient !== this),
+        // then close it gracefully, then connect the new one.
+        val oldClient = signalingClient
+        signalingClient = newClient
+        try { oldClient?.close() } catch (_: Exception) {}
+        newClient.connect()
     }
 
     // #1 Infinite reconnect with exponential back-off capped at 30 s

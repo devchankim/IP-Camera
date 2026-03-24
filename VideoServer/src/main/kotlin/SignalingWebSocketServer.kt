@@ -53,14 +53,14 @@ class SignalingWebSocketServer(
 
     // ── Token ────────────────────────────────────────────────────────────────
     private val requiredToken: String =
-        (System.getenv("SIGNALING_TOKEN") ?: "").trim().also {
+        (DotEnv.get("SIGNALING_TOKEN") ?: "").trim().also {
             if (it.isEmpty()) println("WARNING: SIGNALING_TOKEN is not set. Server will reject all joins.")
         }
 
     // ── #9 TURN servers from env var ────────────────────────────────────────
     // Format: "turn:host:3478|user|pass,turn:host2:3479|user2|pass2"
     private val turnServersJson: String = run {
-        val raw = System.getenv("TURN_SERVERS") ?: ""
+        val raw = DotEnv.get("TURN_SERVERS") ?: ""
         if (raw.isBlank()) return@run "[]"
         val list = raw.split(",").mapNotNull { entry ->
             val parts = entry.trim().split("|")

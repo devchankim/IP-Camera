@@ -56,7 +56,7 @@ class MotionDetector(
     // ── Frame processing (background thread) ─────────────────────────────────
     private fun processFrame(frame: VideoFrame) {
         try {
-            val i420   = frame.buffer.toI420()
+            val i420   = frame.buffer.toI420() ?: return
             val srcW   = i420.width
             val srcH   = i420.height
             val stride = i420.strideY

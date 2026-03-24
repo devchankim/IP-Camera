@@ -1,5 +1,8 @@
 fun main(args: Array<String>) {
 
+    // Load .env file before anything else
+    DotEnv.load()
+
     // Default to WebRTC signaling server.
     // To run legacy MJPEG/WebSocket pipeline, pass: legacy
     if (args.any { it.equals("legacy", ignoreCase = true) }) {
